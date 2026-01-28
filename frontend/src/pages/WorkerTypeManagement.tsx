@@ -10,15 +10,10 @@ import {
   DragEndEvent,
   DragStartEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
 import { Worker, WorkerType, WorkerTypeLabels, WorkerTypeColors } from '../types';
 import WorkerTypeColumn from '../components/WorkerTypeColumn';
-import WorkerCard from '../components/WorkerCard';
 import { io } from 'socket.io-client';
 
 export default function WorkerTypeManagement() {

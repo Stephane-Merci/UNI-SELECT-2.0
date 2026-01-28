@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
-import { Worker, Post } from '../types';
+import { Worker } from '../types';
 import PostColumn from '../components/PostColumn';
 import WorkerCard, { POST_DRAG_PREFIX, POST_DRAG_SEP } from '../components/WorkerCard';
 import CreateWorkerModal from '../components/CreateWorkerModal';

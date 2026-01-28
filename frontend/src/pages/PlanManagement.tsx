@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
-import { Worker, Post, WorkerType, WorkerTypeLabels, WorkerTypeColors, ORIGIN_TYPES } from '../types';
+import { Worker, Post, WorkerType, WorkerTypeColors, ORIGIN_TYPES } from '../types';
 import PostColumn from '../components/PostColumn';
 import WorkerCard, { getWorkerIdFromDragId, PRESENCE_DRAG_PREFIX } from '../components/WorkerCard';
 import CreateWorkerModal from '../components/CreateWorkerModal';
@@ -244,7 +244,6 @@ export default function PlanManagement() {
     assignWorker,
     updateWorkerPresence,
     updateWorkerType,
-    removeAssignment,
   } = useStore();
 
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);

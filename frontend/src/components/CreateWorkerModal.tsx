@@ -28,12 +28,13 @@ export default function CreateWorkerModal({
     }
 
     try {
+      // Pass only the fields expected by the store type:
+      // Omit<Worker, 'id' | 'createdAt' | 'updatedAt' | 'originalPost'> & { originalPostId: string }
       await createWorker({
         anciennete,
         name,
         type,
         originalPostId,
-        originalPost: posts.find((p) => p.id === originalPostId)!,
       });
       onClose();
     } catch (err: any) {
