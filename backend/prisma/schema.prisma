@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkerType {
+  // 6 origin types (Worker.type and create-worker dropdown only)
+  PERMANENT_JOUR
+  PERMANENT_SOIR
+  OCCASIONEL_DU_JOUR
+  OCCASIONEL_SOIR   // label: Occasionel du soir
+  MOBILITE_DU_JOUR
+  MOBILITE_DU_SOIR
+  // Presence-only / legacy (WorkerPresence; not in create-worker dropdown)
+  JOUR
+  SOIR
+  ABSENT
+  VACANCES
+  LIBERATION_EXTERNE
+  INVALIDITE
+  PRERETRAITE
+  CONGE_PARENTAL
+}
+
+model Worker {
+  id            String      @id @default(cuid())
+  anciennete    String      @unique  // was "matricule", label: Ancienneté
+  name          String
+  type          WorkerType  @default(PERMANENT_JOUR) // Origin type, one of the 6
+  originalPostId String
+  originalPost  Post        @relation("OriginalPost", fields: [originalPostId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  assignments   Assignment[]
+  presences     WorkerPresence[]
+  
+  @@index([anciennete])
+  @@index([type])
+}
+
+model Post {
+  id            String      @id @default(cuid())
+  name          String
+  description   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  originalWorkers Worker[]  @relation("OriginalPost")
+  assignments   Assignment[]
+  
+  @@index([name])
+}
+
+model Plan {
+  id            String      @id @default(cuid())
+  name          String      // e.g., "2025-01-24" or "Plan du 24 Janvier"
+  date          DateTime?   // Optional date for the plan
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  createdBy     String?     // Manager ID or name
+  
+  assignments   Assignment[]
+  workerPresences WorkerPresence[]
+  
+  @@index([name])
+  @@index([date])
+}
+
+model Assignment {
+  id            String      @id @default(cuid())
+  planId        String
+  plan          Plan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  workerId      String
+  worker        Worker      @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  postId        String
+  post          Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  assignedAt    DateTime    @default(now())
+  assignedBy    String?     // Manager ID or name
+  
+  @@unique([planId, workerId]) // One worker can only be assigned to one post per plan
+  @@index([planId])
+  @@index([workerId])
+  @@index([postId])
+}
+
+model WorkerPresence {
+  id            String      @id @default(cuid())
+  planId        String
+  plan          Plan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  workerId      String
+  worker        Worker      @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  type          WorkerType  // Presence type for this specific plan
+  updatedAt     DateTime    @default(now()) @updatedAt
+  
+  @@unique([planId, workerId]) // One presence record per worker per plan
+  @@index([planId])
+  @@index([workerId])
+  @@index([type])
+}
+
+model Manager {
+  id            String      @id @default(cuid())
+  username      String      @unique
+  email         String      @unique
+  passwordHash  String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@index([username])
+  @@index([email])
+}
