@@ -80,8 +80,17 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
 
+    // Map validated payload to Prisma shape: connect originalPost, cast type to WorkerType
+    const { originalPostId, type, ...rest } = data;
+
     const worker = await prisma.worker.create({
-      data,
+      data: {
+        ...rest,
+        type: type as WorkerType,
+        originalPost: {
+          connect: { id: originalPostId },
+        },
+      },
       include: {
         originalPost: true,
       },
@@ -101,9 +110,33 @@ router.put('/:id', async (req, res) => {
     const updateSchema = workerSchema.partial();
     const data = updateSchema.parse(req.body);
     
+    const { originalPostId, type, ...rest } = data;
+
+    const updateData: any = { ...rest };
+
+    if (type) {
+      if (!Object.values(WorkerType).includes(type as WorkerType)) {
+        return res.status(400).json({ error: 'Invalid worker type' });
+      }
+      updateData.type = type as WorkerType;
+    }
+
+    if (originalPostId) {
+      // Verify post exists before connecting
+      const post = await prisma.post.findUnique({
+        where: { id: originalPostId },
+      });
+      if (!post) {
+        return res.status(404).json({ error: 'Post not found' });
+      }
+      updateData.originalPost = {
+        connect: { id: originalPostId },
+      };
+    }
+
     const worker = await prisma.worker.update({
       where: { id: req.params.id },
-      data,
+      data: updateData,
       include: {
         originalPost: true,
       },
