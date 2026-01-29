@@ -150,18 +150,27 @@ curl -X POST http://localhost:5000/api/auth/register -H "Content-Type: applicati
 
 ## Deployment
 
-### Frontend (Vercel/Netlify)
-1. Build: `cd frontend && npm run build`
-2. Deploy the `dist` folder
-3. Set environment variable: `VITE_API_URL=https://your-api-url.com/api`
+### Frontend (Netlify)
+1. Base directory: `frontend`
+2. Build: `npm run build`
+3. Publish directory: `dist`
+4. Environment: `VITE_API_URL=https://your-backend-url.com/api`
+5. Add `public/_redirects` with `/* /index.html 200` for SPA routing
 
-### Backend (Railway/Render/AWS)
+### Backend (Render)
+1. **Root directory:** `backend`
+2. **Build Command:** `npm install && npx prisma migrate deploy && npm run build`  
+   Run migrations in the build step so the `Manager` table and schema exist before the app starts. (Pre-Deploy is optional and may be locked on some plans.)
+3. **Start Command:** `npm start`
+4. **Environment:** Set `DATABASE_URL` (Render Postgres internal URL), `JWT_SECRET`, `PORT`, `FRONTEND_URL` (your Netlify URL)
+
+### Backend (Railway/AWS, etc.)
 1. Set environment variables
-2. Run migrations: `npx prisma migrate deploy`
+2. Run migrations: `npx prisma migrate deploy` (in build step or a pre-start script)
 3. Start: `npm start`
 
 ### Database
-- Use managed PostgreSQL (Railway, Supabase, AWS RDS, etc.)
+- Use managed PostgreSQL (Railway, Supabase, Render Postgres, AWS RDS, etc.)
 - Update `DATABASE_URL` in production `.env`
 
 ## Troubleshooting
