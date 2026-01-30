@@ -44,16 +44,18 @@ export const WorkerTypeLabels: Record<WorkerType, string> = {
   [WorkerType.CONGE_PARENTAL]: 'Congé parental',
 };
 
+// Colors per table: Postes fixes jour=Vert, Mobiles jour=Violet, Occasionnels jours=Bleu,
+// Postes fixes soir=Jaune, Mobiles soir=Orange, Occasionnels soir=Marron, Absents=Rouge
 export const WorkerTypeColors: Record<WorkerType, string> = {
-  [WorkerType.PERMANENT_JOUR]: '#2563EB',
-  [WorkerType.PERMANENT_SOIR]: '#7C3AED',
-  [WorkerType.OCCASIONEL_DU_JOUR]: '#3B82F6',
-  [WorkerType.OCCASIONEL_SOIR]: '#8B5CF6',
-  [WorkerType.MOBILITE_DU_JOUR]: '#0EA5E9',
-  [WorkerType.MOBILITE_DU_SOIR]: '#A78BFA',
-  [WorkerType.JOUR]: '#3B82F6',
-  [WorkerType.SOIR]: '#8B5CF6',
-  [WorkerType.ABSENT]: '#EF4444',
+  [WorkerType.PERMANENT_JOUR]: '#008000',   // Vert (Postes fixes de jour)
+  [WorkerType.PERMANENT_SOIR]: '#FFFF00',    // Jaune (Postes fixes de soir)
+  [WorkerType.OCCASIONEL_DU_JOUR]: '#0000FF',   // Bleu (Occasionnels jours)
+  [WorkerType.OCCASIONEL_SOIR]: '#A52A2A',  // Marron (Occasionnels de soir)
+  [WorkerType.MOBILITE_DU_JOUR]: '#EE82EE',     // Violet (Mobiles de jour)
+  [WorkerType.MOBILITE_DU_SOIR]: '#FFA500',     // Orange (Mobiles de soir)
+  [WorkerType.JOUR]: '#0000FF',
+  [WorkerType.SOIR]: '#EE82EE',
+  [WorkerType.ABSENT]: '#FF0000',            // Rouge (Absents)
   [WorkerType.VACANCES]: '#10B981',
   [WorkerType.LIBERATION_EXTERNE]: '#F59E0B',
   [WorkerType.INVALIDITE]: '#6B7280',

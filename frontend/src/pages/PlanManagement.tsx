@@ -17,6 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
+import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
 import { Worker, Post, WorkerType, WorkerTypeColors, ORIGIN_TYPES } from '../types';
 import PostColumn from '../components/PostColumn';
 import WorkerCard, { getWorkerIdFromDragId, PRESENCE_DRAG_PREFIX } from '../components/WorkerCard';
@@ -260,6 +261,7 @@ export default function PlanManagement() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+  const { wrapDragStart, wrapDragEnd } = useAutoScrollDuringDrag();
 
   useEffect(() => {
     fetchWorkers();
@@ -476,8 +478,8 @@ export default function PlanManagement() {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
+          onDragStart={wrapDragStart(handleDragStart)}
+          onDragEnd={wrapDragEnd(handleDragEnd)}
         >
           <div className="flex-1 flex p-6 overflow-hidden gap-4 resizable-container">
             {/* Left Panel - Posts */}

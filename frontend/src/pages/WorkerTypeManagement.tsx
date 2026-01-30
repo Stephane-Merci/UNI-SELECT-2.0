@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
+import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
 import { Worker, WorkerType, WorkerTypeLabels, WorkerTypeColors } from '../types';
 import WorkerTypeColumn from '../components/WorkerTypeColumn';
 import { io } from 'socket.io-client';
@@ -26,6 +27,7 @@ export default function WorkerTypeManagement() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+  const { wrapDragStart, wrapDragEnd } = useAutoScrollDuringDrag();
 
   useEffect(() => {
     const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -100,8 +102,8 @@ export default function WorkerTypeManagement() {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
+        onDragStart={wrapDragStart(handleDragStart)}
+        onDragEnd={wrapDragEnd(handleDragEnd)}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {visibleTypes.map((type) => (

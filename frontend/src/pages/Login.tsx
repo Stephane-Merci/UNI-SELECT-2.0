@@ -31,8 +31,19 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <div className="flex flex-col items-center">
+          <img
+            src="/uniselect-logo.webp"
+            alt="Uniselect"
+            className="h-20 w-auto object-contain mb-4"
+          />
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+            UNISELECT
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            WORKFORCE VERSION 2026
+          </p>
+          <h2 className="mt-6 text-center text-xl font-semibold text-gray-700">
             Connexion
           </h2>
         </div>
