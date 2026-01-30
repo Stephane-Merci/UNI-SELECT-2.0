@@ -377,7 +377,12 @@ export default function PlanManagement() {
     // Check if dropping on a post
     const post = posts.find((p) => p.id === overId);
     if (post) {
-      // Assign worker to post (worker stays in their presence box)
+      const worker = workers.find((w) => w.id === workerId);
+      // When assigning from presence/absence (Absent, Vacances, etc.) to a post, set presence
+      // back to the worker's origin type (e.g. PERMANENT_JOUR) so they're shown as "back to work"
+      if (worker) {
+        await updateWorkerPresence(currentPlan.id, workerId, worker.type);
+      }
       await assignWorker(currentPlan.id, workerId, post.id);
       return;
     }
