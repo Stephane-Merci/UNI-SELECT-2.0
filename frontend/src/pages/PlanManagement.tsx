@@ -243,6 +243,7 @@ export default function PlanManagement() {
     loadPlan,
     copyPlan,
     assignWorker,
+    removeAssignment,
     updateWorkerPresence,
     updateWorkerType,
   } = useStore();
@@ -347,21 +348,27 @@ export default function PlanManagement() {
     if (!workerId) return;
     const overId = String(over.id);
 
-    // Check if dropping on a presence type box (change worker type or presence)
+    // Check if dropping on a presence type box (fiche de présence): unassign from post and update presence
     if (overId.startsWith('presence-')) {
+      // Remove assignment so worker disappears from posts section and appears in fiche de présence
+      const existingAssignment = assignments.find(
+        (a) => a.workerId === workerId && a.planId === currentPlan.id
+      );
+      if (existingAssignment) {
+        await removeAssignment(existingAssignment.id);
+      }
+
       const droppedType = overId.replace('presence-', '') as WorkerType;
       if (Object.values(WorkerType).includes(droppedType)) {
         const currentPresenceType = presenceMap[workerId] ?? workers.find((w) => w.id === workerId)?.type;
-        if (currentPresenceType === droppedType) return;
-
-        const isOriginType = ORIGIN_TYPES.includes(droppedType);
-        if (isOriginType) {
-          // Within the 6 origin types: update Worker.type (origin) permanently and presence for this plan
-          await updateWorkerType(workerId, droppedType);
-          await updateWorkerPresence(currentPlan.id, workerId, droppedType);
-        } else {
-          // Outside the 6: update presence for this plan only (new plan will show worker as original type)
-          await updateWorkerPresence(currentPlan.id, workerId, droppedType);
+        if (currentPresenceType !== droppedType) {
+          const isOriginType = ORIGIN_TYPES.includes(droppedType);
+          if (isOriginType) {
+            await updateWorkerType(workerId, droppedType);
+            await updateWorkerPresence(currentPlan.id, workerId, droppedType);
+          } else {
+            await updateWorkerPresence(currentPlan.id, workerId, droppedType);
+          }
         }
       }
       return;
@@ -415,8 +422,10 @@ export default function PlanManagement() {
     };
   }, [isResizing]);
 
-  // All workers are shown, using their presence type or default type
+  // Posts panel: all workers (assignments filter who appears on each post)
   const allWorkersForDisplay = workers;
+  // Fiche de présence: only workers not assigned to any post; once dragged to a post they disappear from here
+  const workersForPresencePanel = workers.filter((w) => !assignmentMap[w.id]);
 
   const handleAutoAssign = async () => {
     if (!currentPlan) return;
@@ -511,7 +520,7 @@ export default function PlanManagement() {
               style={{ minWidth: '300px' }}
             >
               <PresencePanel
-                workers={allWorkersForDisplay}
+                workers={workersForPresencePanel}
                 presences={presenceMap}
                 searchFilter={presenceSearchFilter}
                 onSearchChange={setPresenceSearchFilter}
