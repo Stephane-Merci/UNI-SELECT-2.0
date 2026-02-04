@@ -215,7 +215,10 @@ function PostsPanel({
     <div className="h-full flex flex-col">
       <h2 className="text-xl font-bold mb-4 text-gray-800">Postes</h2>
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          className="grid gap-2"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 130px))' }}
+        >
           {/* Post Columns */}
           {posts.map((post) => (
             <PostColumn

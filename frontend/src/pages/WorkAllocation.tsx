@@ -240,7 +240,10 @@ export default function WorkAllocation() {
         onDragEnd={wrapDragEnd(handleDragEnd)}
       >
         <div className="h-[calc(100vh-220px)] min-h-[400px] overflow-hidden flex flex-col">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 flex-1 min-h-0 [grid-auto-rows:1fr]">
+          <div
+            className="grid gap-2 flex-1 min-h-0"
+            style={{ gridTemplateColumns: `minmax(130px, min(1fr, 180px)) repeat(${posts.length}, 130px)` }}
+          >
             <UnassignedColumn workers={getUnassignedWorkers()} postId={UNASSIGNED_ZONE} />
             {posts.map((post) => (
               <PostColumn

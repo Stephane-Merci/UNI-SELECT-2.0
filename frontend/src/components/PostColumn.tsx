@@ -66,7 +66,7 @@ export default function PostColumn({ post, workers }: PostColumnProps) {
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col h-full min-h-0 bg-white rounded-lg p-2 min-h-0 border-2 ${
+      className={`flex flex-col h-full min-h-0 bg-white rounded-lg p-2 min-h-0 border-2 max-w-[130px] w-full ${
         isOver ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
       }`}
     >
@@ -118,7 +118,7 @@ export default function PostColumn({ post, workers }: PostColumnProps) {
           items={workers.map((w) => `${POST_DRAG_PREFIX}${post.id}${POST_DRAG_SEP}${w.id}`)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="grid grid-cols-3 gap-1 min-h-0">
+          <div className="flex flex-col gap-1 min-h-0">
             {workers.length > 0 ? (
               workers.map((worker) => (
                 <WorkerCard
@@ -128,7 +128,7 @@ export default function PostColumn({ post, workers }: PostColumnProps) {
                 />
               ))
             ) : (
-            <p className="text-[10px] text-gray-400 italic text-center py-2 col-span-3">
+            <p className="text-[10px] text-gray-400 italic text-center py-2">
               Aucun travailleur assigné
             </p>
             )}
