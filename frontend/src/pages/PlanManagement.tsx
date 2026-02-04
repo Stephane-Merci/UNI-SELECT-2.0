@@ -70,16 +70,16 @@ function PresenceBox({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-white rounded-lg p-3 border-2 min-h-[120px] ${
+      className={`bg-white rounded-lg p-2 border-2 min-h-0 ${
         isOver ? 'bg-blue-50 border-blue-400' : ''
       }`}
       style={{
         borderLeftColor: WorkerTypeColors[primaryType],
-        borderLeftWidth: '5px',
+        borderLeftWidth: '4px',
       }}
     >
       <h3
-        className="font-bold text-sm mb-2"
+        className="font-bold text-xs mb-1.5"
         style={{ color: WorkerTypeColors[primaryType] }}
       >
         {groupName} ({groupWorkers.length})
@@ -88,7 +88,10 @@ function PresenceBox({
         items={groupWorkers.map((w) => `${PRESENCE_DRAG_PREFIX}${w.id}`)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="grid grid-cols-4 gap-1.5 min-h-[60px]">
+        <div
+          className="grid gap-0.5 min-h-0 w-max"
+          style={{ gridTemplateColumns: 'repeat(4, 110px)' }}
+        >
           {groupWorkers.length > 0 ? (
             groupWorkers.map((worker) => {
               const workerPresenceType = presences[worker.id] || worker.type;
@@ -102,7 +105,7 @@ function PresenceBox({
               );
             })
           ) : (
-            <p className="text-xs text-gray-400 italic text-center py-2 col-span-3">
+            <p className="text-[10px] text-gray-400 italic text-center py-1 col-span-4">
               Vide
             </p>
           )}
@@ -150,11 +153,11 @@ function PresencePanel({
             onClick={onAutoClick}
             className="px-3 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700"
           >
-            Auto
+            Assignement automatique
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+      <div className="flex-1 overflow-y-auto space-y-2 pr-2">
         {filteredMainEntries.map(([groupName, groupTypes]) => (
           <PresenceBox
             key={groupName}
@@ -442,7 +445,18 @@ export default function PlanManagement() {
       const pt = presenceMap[w.id] ?? w.type;
       return visibleGroupTypes.includes(pt);
     });
-    for (const w of visibleWorkers) {
+    // Only assign Permanent jour / Permanent soir (not mobile, not occasionel)
+    const permanentOnly = [
+      WorkerType.PERMANENT_JOUR,
+      WorkerType.PERMANENT_SOIR,
+      WorkerType.JOUR,
+      WorkerType.SOIR,
+    ];
+    const toAssign = visibleWorkers.filter((w) => {
+      const pt = presenceMap[w.id] ?? w.type;
+      return permanentOnly.includes(pt);
+    });
+    for (const w of toAssign) {
       await assignWorker(currentPlan.id, w.id, w.originalPostId);
     }
   };

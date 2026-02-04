@@ -23,7 +23,7 @@ export default function WorkerTypeColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-lg p-4 min-h-[200px] border-2 ${
+      className={`rounded-lg p-2 min-h-0 border-2 ${
         isOver ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
       }`}
       style={{
@@ -33,7 +33,7 @@ export default function WorkerTypeColumn({
       }}
     >
       <h2
-        className="font-semibold text-lg mb-4"
+        className="font-semibold text-sm mb-1.5"
         style={{ color }}
       >
         {label} ({workers.length})
@@ -42,7 +42,7 @@ export default function WorkerTypeColumn({
         items={workers.map((w) => w.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-2">
+        <div className="space-y-1">
           {workers.map((worker) => (
             <WorkerCard key={worker.id} worker={worker} />
           ))}

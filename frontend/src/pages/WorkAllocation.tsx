@@ -34,16 +34,16 @@ function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: stri
   return (
     <div
       ref={setNodeRef}
-      className={`bg-gray-100 rounded-lg p-4 min-h-[200px] border-2 ${
+      className={`flex flex-col h-full min-h-0 bg-gray-100 rounded-lg p-2 border-2 ${
         isOver ? 'border-blue-500 bg-blue-100' : 'border-gray-200'
       }`}
     >
-      <h2 className="font-semibold text-lg mb-4 text-gray-700">Non assignés</h2>
+      <h2 className="font-semibold text-sm mb-2 text-gray-700 shrink-0">Non assignés</h2>
       <SortableContext
         items={workers.map((w) => (postId ? `${POST_DRAG_PREFIX}${postId}${POST_DRAG_SEP}${w.id}` : w.id))}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-2">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
           {workers.map((worker) => (
             <WorkerCard
               key={worker.id}
@@ -190,7 +190,7 @@ export default function WorkAllocation() {
               onClick={handleStart}
               className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700"
             >
-              Start
+              Commencer le booking
             </button>
           ) : (
             <>
@@ -230,7 +230,7 @@ export default function WorkAllocation() {
       <p className="text-sm text-gray-600 mb-4">
         {inMeeting
           ? 'Réunion en cours : répartissez les travailleurs par zone, puis cliquez sur Enregistrer.'
-          : 'Répartition actuelle par zone originelle. Cliquez sur Start pour lancer une réunion de booking (tous en non assignés), puis Enregistrer pour sauvegarder.'}
+          : 'Répartition actuelle par zone originelle. Cliquez sur Commencer le booking pour lancer une réunion (tous en non assignés), puis Enregistrer pour sauvegarder.'}
       </p>
 
       <DndContext
@@ -239,15 +239,17 @@ export default function WorkAllocation() {
         onDragStart={wrapDragStart(handleDragStart)}
         onDragEnd={wrapDragEnd(handleDragEnd)}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <UnassignedColumn workers={getUnassignedWorkers()} postId={UNASSIGNED_ZONE} />
-          {posts.map((post) => (
-            <PostColumn
-              key={post.id}
-              post={post}
-              workers={getWorkersForPost(post.id)}
-            />
-          ))}
+        <div className="h-[calc(100vh-220px)] min-h-[400px] overflow-hidden flex flex-col">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 flex-1 min-h-0 [grid-auto-rows:1fr]">
+            <UnassignedColumn workers={getUnassignedWorkers()} postId={UNASSIGNED_ZONE} />
+            {posts.map((post) => (
+              <PostColumn
+                key={post.id}
+                post={post}
+                workers={getWorkersForPost(post.id)}
+              />
+            ))}
+          </div>
         </div>
 
         <DragOverlay>

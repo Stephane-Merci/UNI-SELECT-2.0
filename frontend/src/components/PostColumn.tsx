@@ -66,13 +66,13 @@ export default function PostColumn({ post, workers }: PostColumnProps) {
   return (
     <div
       ref={setNodeRef}
-      className={`bg-white rounded-lg p-3 min-h-[150px] border-2 ${
+      className={`flex flex-col h-full min-h-0 bg-white rounded-lg p-2 min-h-0 border-2 ${
         isOver ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
       }`}
     >
-      <div className="flex justify-between items-start mb-3">
+      <div className="flex justify-between items-start mb-2 shrink-0">
         <div className="flex-1">
-          <h2 className="font-semibold text-base text-gray-700">{post.name}</h2>
+          <h2 className="font-semibold text-sm text-gray-700">{post.name}</h2>
           {post.description && (
             <p className="text-xs text-gray-500 mt-1">{post.description}</p>
           )}
@@ -113,26 +113,28 @@ export default function PostColumn({ post, workers }: PostColumnProps) {
           </button>
         </div>
       </div>
-      <SortableContext
-        items={workers.map((w) => `${POST_DRAG_PREFIX}${post.id}${POST_DRAG_SEP}${w.id}`)}
-        strategy={verticalListSortingStrategy}
-      >
-        <div className="grid grid-cols-3 gap-1.5 min-h-[80px]">
-          {workers.length > 0 ? (
-            workers.map((worker) => (
-              <WorkerCard
-                key={worker.id}
-                worker={worker}
-                dragId={`${POST_DRAG_PREFIX}${post.id}${POST_DRAG_SEP}${worker.id}`}
-              />
-            ))
-          ) : (
-            <p className="text-xs text-gray-400 italic text-center py-4 col-span-2">
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <SortableContext
+          items={workers.map((w) => `${POST_DRAG_PREFIX}${post.id}${POST_DRAG_SEP}${w.id}`)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="grid grid-cols-3 gap-1 min-h-0">
+            {workers.length > 0 ? (
+              workers.map((worker) => (
+                <WorkerCard
+                  key={worker.id}
+                  worker={worker}
+                  dragId={`${POST_DRAG_PREFIX}${post.id}${POST_DRAG_SEP}${worker.id}`}
+                />
+              ))
+            ) : (
+            <p className="text-[10px] text-gray-400 italic text-center py-2 col-span-3">
               Aucun travailleur assigné
             </p>
-          )}
-        </div>
-      </SortableContext>
+            )}
+          </div>
+        </SortableContext>
+      </div>
 
       {showUpdateModal && (
         <UpdatePostModal

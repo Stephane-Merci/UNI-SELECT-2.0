@@ -53,7 +53,7 @@ export default function WorkerCard({
     opacity: isDragging ? 0.5 : 1,
     backgroundColor: hexToRgba(typeColor, 0.15),
     borderColor: typeColor,
-    borderWidth: '2px',
+    borderWidth: '1px',
   };
 
   const postName = worker.originalPost?.name ?? '-';
@@ -64,11 +64,11 @@ export default function WorkerCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="rounded px-1.5 py-0.5 shadow-sm hover:shadow cursor-move text-xs border"
+      className="rounded px-1 py-0.5 shadow-sm hover:shadow cursor-move border text-[10px] leading-tight w-[110px] max-w-full min-w-0 overflow-hidden"
     >
-      <div className="flex flex-col gap-0.5 leading-tight">
+      <div className="flex flex-col gap-px">
         <div className="font-medium text-gray-900 truncate">{worker.name}</div>
-        <div className="text-gray-600 text-[10px] truncate" title={`${postName} (${worker.anciennete})`}>
+        <div className="text-gray-500 text-[9px] truncate" title={`${postName} (${worker.anciennete})`}>
           {postName} ({worker.anciennete})
         </div>
       </div>

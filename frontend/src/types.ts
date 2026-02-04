@@ -48,7 +48,7 @@ export const WorkerTypeLabels: Record<WorkerType, string> = {
 // Postes fixes soir=Jaune, Mobiles soir=Orange, Occasionnels soir=Marron, Absents=Rouge
 export const WorkerTypeColors: Record<WorkerType, string> = {
   [WorkerType.PERMANENT_JOUR]: '#008000',   // Vert (Postes fixes de jour)
-  [WorkerType.PERMANENT_SOIR]: '#FFFF00',    // Jaune (Postes fixes de soir)
+  [WorkerType.PERMANENT_SOIR]: '#B8860B',    // Jaune foncé (Postes fixes de soir, lisible)
   [WorkerType.OCCASIONEL_DU_JOUR]: '#0000FF',   // Bleu (Occasionnels jours)
   [WorkerType.OCCASIONEL_SOIR]: '#A52A2A',  // Marron (Occasionnels de soir)
   [WorkerType.MOBILITE_DU_JOUR]: '#EE82EE',     // Violet (Mobiles de jour)

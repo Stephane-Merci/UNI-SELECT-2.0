@@ -73,7 +73,14 @@ export default function Layout() {
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setDropdownOpen(false)}
                     >
-                      Gestion des types
+                      Quart de travail
+                    </Link>
+                    <Link
+                      to="/documentation"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setDropdownOpen(false)}
+                    >
+                      Documentation
                     </Link>
                     <Link
                       to="/admin"

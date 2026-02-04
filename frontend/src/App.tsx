@@ -5,6 +5,7 @@ import WorkAllocation from './pages/WorkAllocation';
 import PlanManagement from './pages/PlanManagement';
 import WorkerTypeManagement from './pages/WorkerTypeManagement';
 import Admin from './pages/Admin';
+import Documentation from './pages/Documentation';
 import Login from './pages/Login';
 import { useAuthStore } from './store/useAuthStore';
 
@@ -39,6 +40,12 @@ function App() {
           element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
         >
           <Route index element={<WorkerTypeManagement />} />
+        </Route>
+        <Route
+          path="/documentation"
+          element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
+        >
+          <Route index element={<Documentation />} />
         </Route>
         <Route
           path="/admin"

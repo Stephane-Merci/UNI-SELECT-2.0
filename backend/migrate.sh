@@ -1,4 +1,4 @@
-#!/bin/bash
+git #!/bin/bash
 # Script to run database migrations
 
 echo "Generating Prisma Client..."
