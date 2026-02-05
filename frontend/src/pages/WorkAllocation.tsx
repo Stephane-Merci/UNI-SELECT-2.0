@@ -34,7 +34,7 @@ function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: stri
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col h-full min-h-0 bg-gray-100 rounded-lg p-2 border-2 ${
+      className={`flex flex-col min-h-[140px] max-h-[250px] bg-gray-100 rounded-lg p-2 border-2 ${
         isOver ? 'border-blue-500 bg-blue-100' : 'border-gray-200'
       }`}
     >
@@ -43,7 +43,7 @@ function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: stri
         items={workers.map((w) => (postId ? `${POST_DRAG_PREFIX}${postId}${POST_DRAG_SEP}${w.id}` : w.id))}
         strategy={verticalListSortingStrategy}
       >
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1">
           {workers.map((worker) => (
             <WorkerCard
               key={worker.id}
@@ -239,10 +239,10 @@ export default function WorkAllocation() {
         onDragStart={wrapDragStart(handleDragStart)}
         onDragEnd={wrapDragEnd(handleDragEnd)}
       >
-        <div className="h-[calc(100vh-220px)] min-h-[400px] overflow-hidden flex flex-col">
+        <div className="h-[calc(100vh-220px)] min-h-[400px] overflow-y-auto">
           <div
-            className="grid gap-2 flex-1 min-h-0"
-            style={{ gridTemplateColumns: `minmax(130px, min(1fr, 180px)) repeat(${posts.length}, 130px)` }}
+            className="grid gap-2 auto-rows-min p-1"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))' }}
           >
             <UnassignedColumn workers={getUnassignedWorkers()} postId={UNASSIGNED_ZONE} />
             {posts.map((post) => (
