@@ -40,6 +40,7 @@ model Worker {
   updatedAt     DateTime    @updatedAt
   
   assignments   Assignment[]
+  assignmentInteractions AssignmentInteraction[]
   presences     WorkerPresence[]
   
   @@index([anciennete])
@@ -55,6 +56,7 @@ model Post {
   
   originalWorkers Worker[]  @relation("OriginalPost")
   assignments   Assignment[]
+  assignmentInteractions AssignmentInteraction[]
   
   @@index([name])
 }
@@ -68,6 +70,7 @@ model Plan {
   createdBy     String?     // Manager ID or name
   
   assignments   Assignment[]
+  assignmentInteractions AssignmentInteraction[]
   workerPresences WorkerPresence[]
   
   @@index([name])
@@ -89,6 +92,22 @@ model Assignment {
   @@index([planId])
   @@index([workerId])
   @@index([postId])
+}
+
+// Tracks each time a worker is assigned to a post within a plan (for interaction / migration history).
+model AssignmentInteraction {
+  id        String    @id @default(cuid())
+  planId    String
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  workerId  String
+  worker    Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  startedAt DateTime @default(now())
+  endedAt   DateTime? // null = still at this post (or computed at export with 8h rule)
+  
+  @@index([planId])
+  @@index([workerId])
 }
 
 model WorkerPresence {

@@ -88,10 +88,12 @@ function PresenceBox({
         items={groupWorkers.map((w) => `${PRESENCE_DRAG_PREFIX}${w.id}`)}
         strategy={verticalListSortingStrategy}
       >
-        <div
-          className="grid gap-0.5 min-h-0 w-max"
-          style={{ gridTemplateColumns: 'repeat(4, 110px)' }}
-        >
+        {/* 
+          Use a responsive grid that wraps workers instead of forcing the box
+          to grow horizontally. When the fiche de présence panel is narrowed,
+          cards will flow to the next row instead of stretching the section.
+        */}
+        <div className="grid gap-0.5 min-h-0 grid-cols-[repeat(auto-fill,minmax(110px,1fr))]">
           {groupWorkers.length > 0 ? (
             groupWorkers.map((worker) => {
               const workerPresenceType = presences[worker.id] || worker.type;

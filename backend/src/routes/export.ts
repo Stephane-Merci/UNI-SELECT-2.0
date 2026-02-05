@@ -114,7 +114,9 @@ router.get('/posts', async (req, res) => {
   }
 });
 
-// Export a single plan as Excel with 2 sheets: Travailleurs & Postes
+const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
+
+// Export a single plan as Excel with 3 sheets: Travailleurs, Postes, Interaction
 router.get('/plan/:id', async (req, res) => {
   try {
     const plan = await prisma.plan.findUnique({
@@ -136,6 +138,21 @@ router.get('/plan/:id', async (req, res) => {
 
     if (!plan) {
       return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    // Fetch interaction history separately (avoids relying on Plan.assignmentInteractions in generated client)
+    let interactions: Array<{ workerId: string; startedAt: Date; endedAt: Date | null; worker: { anciennete: string; name: string }; post: { name: string } }> = [];
+    try {
+      if (typeof (prisma as any).assignmentInteraction?.findMany === 'function') {
+        const rows = await (prisma as any).assignmentInteraction.findMany({
+          where: { planId: plan.id },
+          include: { worker: true, post: true },
+          orderBy: { startedAt: 'asc' },
+        });
+        interactions = Array.isArray(rows) ? rows : [];
+      }
+    } catch (_) {
+      // Table or model may not exist; export without interaction sheet data
     }
 
     // Load all workers so that even those without presence/assignments appear
@@ -206,7 +223,7 @@ router.get('/plan/:id', async (req, res) => {
       'Nom': p.name,
       'Description': p.description || '',
       'Travailleurs Assignés': (p.assignments as any[]).map(
-        (a) => `${a.worker.name} (${a.worker.anciennete})`
+        (a) => `${a.worker?.name ?? ''} (${a.worker?.anciennete ?? ''})`
       ).join(', '),
       'Nombre de Travailleurs': (p.assignments as any[]).length,
     }));
@@ -219,12 +236,80 @@ router.get('/plan/:id', async (req, res) => {
           ]);
     XLSX.utils.book_append_sheet(workbook, postsSheet, 'Postes');
 
+    // Sheet 3: Interaction – user migrations (post changes) with start/end times
+    const byWorker = new Map<string, typeof interactions>();
+    for (const i of interactions) {
+      const list = byWorker.get(i.workerId) || [];
+      list.push(i);
+      byWorker.set(i.workerId, list);
+    }
+    const formatTime = (d: Date) => d.toISOString().replace('T', ' ').slice(0, 19);
+    const interactionRows: { Séquence: number; Ancienneté: string; Nom: string; Poste: string; Début: string; Fin: string; 'Durée (min)': number }[] = [];
+    const now = new Date();
+    const workersWithInteractions = new Set<string>();
+    for (const [, list] of byWorker) {
+      let totalPrevMs = 0;
+      let seq = 0;
+      for (const i of list) {
+        workersWithInteractions.add(i.workerId);
+        seq += 1;
+        const start = new Date(i.startedAt);
+        let end: Date;
+        let durationMs: number;
+        if (i.endedAt) {
+          end = new Date(i.endedAt);
+          durationMs = end.getTime() - start.getTime();
+        } else {
+          // 8-hour rule: remaining time = 8h - time already spent in previous posts
+          const remainingMs = Math.max(0, EIGHT_HOURS_MS - totalPrevMs);
+          end = new Date(Math.min(start.getTime() + remainingMs, now.getTime()));
+          durationMs = end.getTime() - start.getTime();
+        }
+        totalPrevMs += durationMs;
+        if (i.worker && i.post) {
+          interactionRows.push({
+            Séquence: seq,
+            Ancienneté: i.worker.anciennete ?? '',
+            Nom: i.worker.name ?? '',
+            Poste: i.post.name ?? '',
+            Début: formatTime(start),
+            Fin: formatTime(end),
+            'Durée (min)': Math.round(durationMs / 60000),
+          });
+        }
+      }
+    }
+    // Ensure every worker appears at least once in the Interaction sheet.
+    // Workers without any assignment history get a row with zero duration.
+    for (const w of allWorkers) {
+      if (!workersWithInteractions.has(w.id)) {
+        interactionRows.push({
+          Séquence: 0,
+          Ancienneté: w.anciennete,
+          Nom: w.name,
+          Poste: '',
+          Début: '',
+          Fin: '',
+          'Durée (min)': 0,
+        });
+      }
+    }
+    // Sort by Début so migrations are in chronological order globally
+    interactionRows.sort((a, b) => a.Début.localeCompare(b.Début));
+    const interactionSheet =
+      interactionRows.length > 0
+        ? XLSX.utils.json_to_sheet(interactionRows)
+        : XLSX.utils.aoa_to_sheet([['Séquence', 'Ancienneté', 'Nom', 'Poste', 'Début', 'Fin', 'Durée (min)']]);
+    XLSX.utils.book_append_sheet(workbook, interactionSheet, 'Interaction');
+
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=${encodeURIComponent(safeBase)}.xlsx`);
     res.send(buffer);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to export plan' });
+  } catch (error: any) {
+    console.error('Export plan error:', error?.message ?? error);
+    const message = error?.meta?.cause ?? error?.message ?? 'Failed to export plan';
+    res.status(500).json({ error: String(message) });
   }
 });
 

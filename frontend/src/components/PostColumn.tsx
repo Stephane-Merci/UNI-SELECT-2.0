@@ -66,7 +66,7 @@ export default function PostColumn({ post, workers }: PostColumnProps) {
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col h-full min-h-0 bg-white rounded-lg p-2 min-h-0 border-2 max-w-[130px] w-full ${
+      className={`flex flex-col h-full min-h-0 bg-gray-100 rounded-lg p-2 min-h-0 border-2 max-w-[130px] w-full ${
         isOver ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
       }`}
     >
