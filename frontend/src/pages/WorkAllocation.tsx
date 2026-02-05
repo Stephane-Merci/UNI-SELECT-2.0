@@ -64,6 +64,9 @@ export default function WorkAllocation() {
   const [showPostModal, setShowPostModal] = useState(false);
   // When non-null, we're in "booking meeting" mode: all changes are local until Save.
   const [localZoneMap, setLocalZoneMap] = useState<Record<string, string> | null>(null);
+  // Undo: in meeting mode = stack of previous localZoneMap snapshots; outside = last move only.
+  const [zoneMapHistory, setZoneMapHistory] = useState<Record<string, string>[]>([]);
+  const [lastMove, setLastMove] = useState<{ workerId: string; previousPostId: string } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -112,6 +115,16 @@ export default function WorkAllocation() {
     setActiveWorker(worker);
   };
 
+  const MAX_UNDO_HISTORY = 50;
+
+  const pushZoneMapToHistory = useCallback(() => {
+    if (!localZoneMap) return;
+    setZoneMapHistory((prev) => {
+      const next = [...prev, { ...localZoneMap }];
+      return next.length > MAX_UNDO_HISTORY ? next.slice(-MAX_UNDO_HISTORY) : next;
+    });
+  }, [localZoneMap]);
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveWorker(null);
@@ -120,9 +133,12 @@ export default function WorkAllocation() {
     let workerId = String(active.id);
     if (workerId.includes(POST_DRAG_SEP)) workerId = workerId.split(POST_DRAG_SEP)[1] ?? workerId;
     const overId = String(over.id);
+    const worker = workers.find((x) => x.id === workerId);
+    const previousPostId = worker?.originalPostId ?? UNASSIGNED_ZONE;
 
     if (overId === UNASSIGNED_ZONE) {
       if (localZoneMap) {
+        pushZoneMapToHistory();
         setLocalZoneMap((m) => ({ ...m!, [workerId]: UNASSIGNED_ZONE }));
       }
       return;
@@ -131,11 +147,12 @@ export default function WorkAllocation() {
     const post = posts.find((p) => p.id === overId);
     if (post) {
       if (localZoneMap) {
+        pushZoneMapToHistory();
         setLocalZoneMap((m) => ({ ...m!, [workerId]: post.id }));
       } else {
-        const w = workers.find((x) => x.id === workerId);
-        if (w && w.originalPostId !== post.id) {
+        if (worker && worker.originalPostId !== post.id) {
           await updateWorkerOriginalPost(workerId, post.id);
+          setLastMove({ workerId, previousPostId });
         }
       }
       return;
@@ -147,17 +164,24 @@ export default function WorkAllocation() {
     if (targetWorker) {
       const targetZone = currentZone(targetWorker);
       if (targetZone === UNASSIGNED_ZONE) {
-        if (localZoneMap) setLocalZoneMap((m) => ({ ...m!, [workerId]: UNASSIGNED_ZONE }));
+        if (localZoneMap) {
+          pushZoneMapToHistory();
+          setLocalZoneMap((m) => ({ ...m!, [workerId]: UNASSIGNED_ZONE }));
+        }
       } else {
-        if (localZoneMap) setLocalZoneMap((m) => ({ ...m!, [workerId]: targetZone }));
-        else if (workers.find((x) => x.id === workerId)?.originalPostId !== targetZone) {
+        if (localZoneMap) {
+          pushZoneMapToHistory();
+          setLocalZoneMap((m) => ({ ...m!, [workerId]: targetZone }));
+        } else if (worker && worker.originalPostId !== targetZone) {
           await updateWorkerOriginalPost(workerId, targetZone);
+          setLastMove({ workerId, previousPostId });
         }
       }
     }
   };
 
   const handleStart = () => {
+    setZoneMapHistory([]);
     setLocalZoneMap(Object.fromEntries(workers.map((w) => [w.id, UNASSIGNED_ZONE])));
   };
 
@@ -171,11 +195,29 @@ export default function WorkAllocation() {
     }
     await fetchWorkers();
     setLocalZoneMap(null);
+    setZoneMapHistory([]);
   };
 
   const handleCancel = () => {
     setLocalZoneMap(null);
+    setZoneMapHistory([]);
   };
+
+  const handleUndo = async () => {
+    if (localZoneMap && zoneMapHistory.length > 0) {
+      const previous = zoneMapHistory[zoneMapHistory.length - 1];
+      setZoneMapHistory((prev) => prev.slice(0, -1));
+      setLocalZoneMap(previous);
+      return;
+    }
+    if (!localZoneMap && lastMove) {
+      await updateWorkerOriginalPost(lastMove.workerId, lastMove.previousPostId);
+      await fetchWorkers();
+      setLastMove(null);
+    }
+  };
+
+  const canUndo = (localZoneMap !== null && zoneMapHistory.length > 0) || (!localZoneMap && lastMove !== null);
 
   const inMeeting = localZoneMap !== null;
 
@@ -184,6 +226,16 @@ export default function WorkAllocation() {
       <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Booking</h1>
         <div className="flex items-center gap-2 flex-wrap">
+          {canUndo && (
+            <button
+              type="button"
+              onClick={handleUndo}
+              className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700"
+              title="Annuler la dernière action"
+            >
+              Annuler l&apos;action
+            </button>
+          )}
           {!inMeeting ? (
             <button
               type="button"

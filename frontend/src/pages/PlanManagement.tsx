@@ -259,6 +259,11 @@ export default function PlanManagement() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(50); // Percentage
   const [isResizing, setIsResizing] = useState(false);
   const [presenceSearchFilter, setPresenceSearchFilter] = useState('');
+  const [lastPlanAction, setLastPlanAction] = useState<{
+    workerId: string;
+    previousPostId: string | null;
+    previousPresenceType: WorkerType;
+  } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -273,6 +278,10 @@ export default function PlanManagement() {
     fetchPosts();
     fetchPlans();
   }, [fetchWorkers, fetchPosts, fetchPlans]);
+
+  useEffect(() => {
+    setLastPlanAction(null);
+  }, [currentPlan?.id]);
 
   useEffect(() => {
     if (currentPlan) {
@@ -352,8 +361,13 @@ export default function PlanManagement() {
     if (!workerId) return;
     const overId = String(over.id);
 
+    const worker = workers.find((w) => w.id === workerId);
+    const previousPresenceType = presenceMap[workerId] ?? worker?.type ?? ('' as WorkerType);
+    const previousPostId = assignmentMap[workerId] ?? null;
+
     // Check if dropping on a presence type box (fiche de présence): unassign from post and update presence
     if (overId.startsWith('presence-')) {
+      setLastPlanAction({ workerId, previousPostId, previousPresenceType });
       // Remove assignment so worker disappears from posts section and appears in fiche de présence
       const existingAssignment = assignments.find(
         (a) => a.workerId === workerId && a.planId === currentPlan.id
@@ -364,7 +378,7 @@ export default function PlanManagement() {
 
       const droppedType = overId.replace('presence-', '') as WorkerType;
       if (Object.values(WorkerType).includes(droppedType)) {
-        const currentPresenceType = presenceMap[workerId] ?? workers.find((w) => w.id === workerId)?.type;
+        const currentPresenceType = presenceMap[workerId] ?? worker?.type;
         if (currentPresenceType !== droppedType) {
           const isOriginType = ORIGIN_TYPES.includes(droppedType);
           if (isOriginType) {
@@ -381,7 +395,7 @@ export default function PlanManagement() {
     // Check if dropping on a post
     const post = posts.find((p) => p.id === overId);
     if (post) {
-      const worker = workers.find((w) => w.id === workerId);
+      setLastPlanAction({ workerId, previousPostId: null, previousPresenceType });
       // When assigning from presence/absence (Absent, Vacances, etc.) to a post, set presence
       // back to the worker's origin type (e.g. PERMANENT_JOUR) so they're shown as "back to work"
       if (worker) {
@@ -389,6 +403,28 @@ export default function PlanManagement() {
       }
       await assignWorker(currentPlan.id, workerId, post.id);
       return;
+    }
+  };
+
+  const handleUndoPlan = async () => {
+    if (!currentPlan || !lastPlanAction) return;
+    const { workerId, previousPostId, previousPresenceType } = lastPlanAction;
+    try {
+      if (previousPostId !== null) {
+        await assignWorker(currentPlan.id, workerId, previousPostId);
+        await updateWorkerPresence(currentPlan.id, workerId, previousPresenceType);
+      } else {
+        const a = assignments.find(
+          (x) => x.planId === currentPlan.id && x.workerId === workerId
+        );
+        if (a) await removeAssignment(a.id);
+        await updateWorkerPresence(currentPlan.id, workerId, previousPresenceType);
+      }
+      await fetchAssignments(currentPlan.id);
+      await fetchWorkers();
+      setLastPlanAction(null);
+    } catch (e) {
+      console.error('Undo failed:', e);
     }
   };
 
@@ -480,6 +516,16 @@ export default function PlanManagement() {
             )}
           </div>
           <div className="flex items-center space-x-4">
+            {currentPlan && lastPlanAction && (
+              <button
+                type="button"
+                onClick={handleUndoPlan}
+                className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700"
+                title="Annuler la dernière action"
+              >
+                Annuler l&apos;action
+              </button>
+            )}
             <button
               onClick={() => setShowPlanModal(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
