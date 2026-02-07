@@ -186,7 +186,7 @@ export default function PlanManagementModal({
       for (const p of workerPresences) {
         if (p.workerId && p.type) presenceByWorkerId.set(p.workerId, p.type);
       }
-      const byPost = new Map<string, { name: string; description?: string | null; workers: { name: string; anciennete: string; type: string; originalPostName: string }[] }>();
+      const byPost = new Map<string, { name: string; description?: string | null; workers: { name: string; anciennete: string; type: string; originalPostName: string; color: string }[] }>();
       for (const a of assignments) {
         const postName = a.post?.name || 'Poste';
         const postDesc = a.post?.description;
