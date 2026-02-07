@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
-import { Worker } from '../types';
+import { Worker, WorkerTypeColors } from '../types';
 import PostColumn from '../components/PostColumn';
 import WorkerCard, { POST_DRAG_PREFIX, POST_DRAG_SEP } from '../components/WorkerCard';
 import CreateWorkerModal from '../components/CreateWorkerModal';
@@ -221,6 +221,95 @@ export default function WorkAllocation() {
 
   const inMeeting = localZoneMap !== null;
 
+  const handlePrintBooking = () => {
+    const unassigned = getUnassignedWorkers();
+    const zoneCards: string[] = [];
+
+    // Non assignés
+    const unassignedCard = `
+      <div class="zone-card">
+        <div class="zone-title">Non assignés</div>
+        <div class="zone-workers">
+          ${unassigned.length > 0
+            ? unassigned
+                .map(
+                  (w) => {
+                    const color = (WorkerTypeColors as Record<string, string>)[w.type] || '#e5e7eb';
+                    const originalName = w.originalPost?.name ?? '-';
+                    return `<div class="worker-card" style="background-color:${color}20;border-left:3px solid ${color};">
+                      <div class="worker-name">${w.name}</div>
+                      <div class="worker-meta">${originalName} (${w.anciennete})</div>
+                    </div>`;
+                  }
+                )
+                .join('')
+            : '<span class="text-gray-400 italic">Vide</span>'}
+        </div>
+      </div>`;
+    zoneCards.push(unassignedCard);
+
+    // Each post
+    for (const post of posts) {
+      const postWorkers = getWorkersForPost(post.id);
+      const card = `
+      <div class="zone-card">
+        <div class="zone-title">${post.name}</div>
+        ${post.description ? `<div class="zone-desc">${post.description}</div>` : ''}
+        <div class="zone-workers">
+          ${postWorkers.length > 0
+            ? postWorkers
+                .map(
+                  (w) => {
+                    const color = (WorkerTypeColors as Record<string, string>)[w.type] || '#e5e7eb';
+                    const originalName = w.originalPost?.name ?? '-';
+                    return `<div class="worker-card" style="background-color:${color}20;border-left:3px solid ${color};">
+                      <div class="worker-name">${w.name}</div>
+                      <div class="worker-meta">${originalName} (${w.anciennete})</div>
+                    </div>`;
+                  }
+                )
+                .join('')
+            : '<span class="text-gray-400 italic">Vide</span>'}
+        </div>
+      </div>`;
+      zoneCards.push(card);
+    }
+
+    const title = 'Booking – Répartition par zone';
+    const dateStr = new Date().toLocaleDateString('fr-FR');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+    <style>
+      *{box-sizing:border-box;}
+      body{font-family:sans-serif;padding:1rem;margin:0;background:#f3f4f6;}
+      .print-header{font-size:1.25rem;font-weight:700;margin-bottom:0.5rem;}
+      .print-date{color:#6b7280;font-size:0.875rem;margin-bottom:1rem;}
+      .zones{display:flex;flex-wrap:wrap;gap:0.75rem;}
+      .zone-card{background:#fff;border-radius:0.5rem;padding:0.75rem;min-width:180px;max-width:280px;box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+      .zone-title{font-weight:600;font-size:0.95rem;margin-bottom:0.25rem;}
+      .zone-desc{font-size:0.75rem;color:#6b7280;margin-bottom:0.5rem;}
+      .zone-workers{display:flex;flex-wrap:wrap;gap:0.35rem;}
+      .worker-card{border-radius:0.25rem;padding:0.35rem 0.5rem;font-size:10px;line-height:1.2;min-width:90px;}
+      .worker-name{font-weight:500;color:#111;}
+      .worker-meta{color:#4b5563;font-size:9px;}
+    </style>
+    </head><body>
+    <div class="print-header">${title}</div>
+    <div class="print-date">${dateStr}</div>
+    <div class="zones">${zoneCards.join('')}</div>
+    </body></html>`;
+
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => {
+        w.print();
+        w.close();
+      }, 400);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
@@ -275,6 +364,14 @@ export default function WorkAllocation() {
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
           >
             Créer Poste
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintBooking}
+            className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700"
+            title="Imprimer la répartition actuelle"
+          >
+            Imprimer
           </button>
         </div>
       </div>
