@@ -1,6 +1,6 @@
 import express from 'express';
 import { prisma, io } from '../index';
-import { WorkerType } from '@prisma/client';
+import { WorkerType } from '../generated/prisma';
 import { z } from 'zod';
 
 const router = express.Router();

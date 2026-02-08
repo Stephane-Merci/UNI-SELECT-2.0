@@ -39,3 +39,4 @@ yarn-error.log*
 
 # Prisma
 backend/prisma/migrations/
+backend/src/generated/

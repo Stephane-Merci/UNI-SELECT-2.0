@@ -403,7 +403,7 @@ router.delete('/:id', async (req, res) => {
 router.put('/:id/presence/:workerId', async (req, res) => {
   try {
     const { type } = req.body;
-    const { WorkerType } = await import('@prisma/client');
+    const { WorkerType } = await import('../generated/prisma');
     
     if (!Object.values(WorkerType).includes(type)) {
       return res.status(400).json({ error: 'Invalid worker type' });
