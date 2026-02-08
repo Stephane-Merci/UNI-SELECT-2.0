@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -42,7 +43,11 @@ model Worker {
   assignments   Assignment[]
   assignmentInteractions AssignmentInteraction[]
   presences     WorkerPresence[]
-  
+  bookingAssignments BookingAssignment[]
+  bookingReplacements1 BookingReplacement[] @relation("Replacement1")
+  bookingReplacements2 BookingReplacement[] @relation("Replacement2")
+  bookingReplacements3 BookingReplacement[] @relation("Replacement3")
+
   @@index([anciennete])
   @@index([type])
 }
@@ -57,7 +62,9 @@ model Post {
   originalWorkers Worker[]  @relation("OriginalPost")
   assignments   Assignment[]
   assignmentInteractions AssignmentInteraction[]
-  
+  bookingAssignments BookingAssignment[]
+  bookingReplacements BookingReplacement[]
+
   @@index([name])
 }
 
@@ -125,6 +132,51 @@ model WorkerPresence {
   @@index([type])
 }
 
+// Saved booking: snapshot of worker->post for a future effective date. Does not change workers until "activated".
+model Booking {
+  id             String    @id @default(cuid())
+  name           String
+  effectiveDate  DateTime  // Date when this booking is intended to take effect
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  assignments    BookingAssignment[]
+  replacements   BookingReplacement[]
+
+  @@index([effectiveDate])
+}
+
+model BookingAssignment {
+  id         String   @id @default(cuid())
+  bookingId  String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  workerId   String
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  postId     String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, workerId])
+  @@index([bookingId])
+}
+
+// Per-booking replacement rules: for a post that needs replacement (e.g. assigned workers absent), up to 3 replacement workers.
+model BookingReplacement {
+  id                   String   @id @default(cuid())
+  bookingId            String
+  booking             Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  postId               String
+  post                Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  replacement1WorkerId String?
+  replacement1Worker   Worker?  @relation("Replacement1", fields: [replacement1WorkerId], references: [id], onDelete: SetNull)
+  replacement2WorkerId String?
+  replacement2Worker   Worker?  @relation("Replacement2", fields: [replacement2WorkerId], references: [id], onDelete: SetNull)
+  replacement3WorkerId String?
+  replacement3Worker   Worker?  @relation("Replacement3", fields: [replacement3WorkerId], references: [id], onDelete: SetNull)
+
+  @@unique([bookingId, postId])
+  @@index([bookingId])
+}
+
 model Manager {
   id            String      @id @default(cuid())
   username      String      @unique
@@ -132,7 +184,7 @@ model Manager {
   passwordHash  String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-  
+
   @@index([username])
   @@index([email])
 }

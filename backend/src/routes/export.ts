@@ -79,6 +79,22 @@ router.get('/plans', async (req, res) => {
   }
 });
 
+// Same order as main posts API: PIC* first, MET* second, then alphabetical
+function sortPostsByName<T extends { name: string }>(items: T[]): T[] {
+  const order = (name: string): [number, string] => {
+    const upper = (name || '').toUpperCase();
+    if (upper.startsWith('PIC')) return [0, name];
+    if (upper.startsWith('MET')) return [1, name];
+    return [2, name];
+  };
+  return [...items].sort((a, b) => {
+    const [rA, nA] = order(a.name);
+    const [rB, nB] = order(b.name);
+    if (rA !== rB) return rA - rB;
+    return nA.localeCompare(nB, undefined, { sensitivity: 'base' });
+  });
+}
+
 // Export posts to Excel
 router.get('/posts', async (req, res) => {
   try {
@@ -91,8 +107,9 @@ router.get('/posts', async (req, res) => {
         },
       },
     });
+    const sortedPosts = sortPostsByName(posts);
 
-    const data = posts.map(post => ({
+    const data = sortedPosts.map(post => ({
       'Nom': post.name,
       'Description': post.description || '',
       'Travailleurs Assignés': post.assignments.map(a => `${a.worker.name} (${a.worker.anciennete})`).join(', '),
@@ -219,14 +236,17 @@ router.get('/plan/:id', async (req, res) => {
       postsById.set(key, existing);
     }
 
-    const postRows = Array.from(postsById.values()).map((p) => ({
-      'Nom': p.name,
-      'Description': p.description || '',
-      'Travailleurs Assignés': (p.assignments as any[]).map(
-        (a) => `${a.worker?.name ?? ''} (${a.worker?.anciennete ?? ''})`
-      ).join(', '),
-      'Nombre de Travailleurs': (p.assignments as any[]).length,
-    }));
+    const postRows = sortPostsByName(
+      Array.from(postsById.values()).map((p) => ({
+        name: p.name,
+        'Nom': p.name,
+        'Description': p.description || '',
+        'Travailleurs Assignés': (p.assignments as any[]).map(
+          (a) => `${a.worker?.name ?? ''} (${a.worker?.anciennete ?? ''})`
+        ).join(', '),
+        'Nombre de Travailleurs': (p.assignments as any[]).length,
+      }))
+    ).map(({ name: _n, ...row }) => row);
 
     const postsSheet =
       postRows.length > 0

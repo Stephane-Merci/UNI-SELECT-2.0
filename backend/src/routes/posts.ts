@@ -9,7 +9,15 @@ const postSchema = z.object({
   description: z.string().optional(),
 });
 
-// Get all posts
+// Order posts: PIC* first, MET* second, then others — each group alphabetically by name
+function postSortOrder(name: string): [number, string] {
+  const upper = (name || '').toUpperCase();
+  if (upper.startsWith('PIC')) return [0, name];
+  if (upper.startsWith('MET')) return [1, name];
+  return [2, name];
+}
+
+// Get all posts (ordered: PIC first, MET second, then rest alphabetically)
 router.get('/', async (req, res) => {
   try {
     const posts = await prisma.post.findMany({
@@ -24,6 +32,12 @@ router.get('/', async (req, res) => {
           },
         },
       },
+    });
+    posts.sort((a, b) => {
+      const [rankA, nameA] = postSortOrder(a.name);
+      const [rankB, nameB] = postSortOrder(b.name);
+      if (rankA !== rankB) return rankA - rankB;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
     });
     res.json(posts);
   } catch (error) {
