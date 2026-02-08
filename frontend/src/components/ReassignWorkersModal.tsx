@@ -102,7 +102,7 @@ export default function ReassignWorkersModal({
           <ul className="list-disc list-inside space-y-1 mb-4">
             {workers.map((worker) => (
               <li key={worker.id} className="text-sm text-gray-600">
-                {worker.name} ({worker.anciennete})
+                ({worker.anciennete}) {worker.name}
               </li>
             ))}
           </ul>

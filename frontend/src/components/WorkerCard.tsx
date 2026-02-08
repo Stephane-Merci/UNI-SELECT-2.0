@@ -67,9 +67,9 @@ export default function WorkerCard({
       className="rounded px-1 py-0.5 shadow-sm hover:shadow cursor-move border text-[10px] leading-tight w-[110px] max-w-full min-w-0 overflow-hidden"
     >
       <div className="flex flex-col gap-px">
-        <div className="font-medium text-gray-900 truncate">{worker.name}</div>
-        <div className="text-gray-500 text-[9px] truncate" title={`${postName} (${worker.anciennete})`}>
-          {postName} ({worker.anciennete})
+        <div className="font-medium text-gray-900 truncate">({worker.anciennete}) {worker.name}</div>
+        <div className="text-gray-500 text-[9px] truncate" title={postName}>
+          {postName}
         </div>
       </div>
     </div>

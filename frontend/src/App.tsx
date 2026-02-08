@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import Layout from './components/Layout';
 import WorkAllocation from './pages/WorkAllocation';
 import PlanManagement from './pages/PlanManagement';
+import ViewReplacements from './pages/ViewReplacements';
 import WorkerTypeManagement from './pages/WorkerTypeManagement';
 import Admin from './pages/Admin';
 import Documentation from './pages/Documentation';
@@ -28,6 +29,12 @@ function App() {
           element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
         >
           <Route index element={<PlanManagement />} />
+        </Route>
+        <Route
+          path="/replacements"
+          element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
+        >
+          <Route index element={<ViewReplacements />} />
         </Route>
         <Route
           path="/work-allocation"

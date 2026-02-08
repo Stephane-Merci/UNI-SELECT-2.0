@@ -223,8 +223,8 @@ export default function PlanManagementModal({
               .map(
                 (w) => `
               <div class="worker-card" style="background-color:${w.color}20;border-left:3px solid ${w.color};">
-                <div class="worker-name">${w.name}</div>
-                <div class="worker-meta">${w.originalPostName} (${w.anciennete})</div>
+                <div class="worker-name">(${w.anciennete}) ${w.name}</div>
+                <div class="worker-meta">${w.originalPostName}</div>
               </div>`
               )
               .join('')}
@@ -235,6 +235,7 @@ export default function PlanManagementModal({
       const html = `
         <!DOCTYPE html><html><head><meta charset="utf-8"><title>${plan.name}</title>
         <style>
+          @page { size: landscape; }
           *{box-sizing:border-box;}
           body{font-family:sans-serif;padding:1rem;margin:0;background:#f3f4f6;}
           .print-header{font-size:1.25rem;font-weight:700;margin-bottom:0.5rem;}

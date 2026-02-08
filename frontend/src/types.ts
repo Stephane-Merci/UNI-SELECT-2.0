@@ -116,3 +116,34 @@ export interface WorkerPresence {
   type: WorkerType;
   updatedAt: string;
 }
+
+export interface BookingAssignment {
+  id: string;
+  bookingId: string;
+  workerId: string;
+  worker?: Worker;
+  postId: string;
+  post?: Post;
+}
+
+export interface Booking {
+  id: string;
+  name: string;
+  effectiveDate: string;
+  createdAt: string;
+  updatedAt: string;
+  assignments: BookingAssignment[];
+}
+
+export interface BookingReplacement {
+  id: string;
+  bookingId: string;
+  postId: string;
+  post?: Post;
+  replacement1WorkerId: string | null;
+  replacement1Worker?: Worker | null;
+  replacement2WorkerId: string | null;
+  replacement2Worker?: Worker | null;
+  replacement3WorkerId: string | null;
+  replacement3Worker?: Worker | null;
+}

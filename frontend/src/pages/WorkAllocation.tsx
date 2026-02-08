@@ -18,12 +18,14 @@ import {
 } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
-import { Worker, WorkerTypeColors } from '../types';
+import { Worker, WorkerTypeColors, Booking, BookingReplacement } from '../types';
 import PostColumn from '../components/PostColumn';
 import WorkerCard, { POST_DRAG_PREFIX, POST_DRAG_SEP } from '../components/WorkerCard';
-import CreateWorkerModal from '../components/CreateWorkerModal';
-import CreatePostModal from '../components/CreatePostModal';
+import { Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import apiClient from '../api/client';
+
+type ReplacementSlot = { r1: string | null; r2: string | null; r3: string | null };
 
 const UNASSIGNED_ZONE = 'unassigned';
 
@@ -60,13 +62,24 @@ function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: stri
 export default function WorkAllocation() {
   const { workers, posts, fetchWorkers, fetchPosts, updateWorkerOriginalPost } = useStore();
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);
-  const [showWorkerModal, setShowWorkerModal] = useState(false);
-  const [showPostModal, setShowPostModal] = useState(false);
   // When non-null, we're in "booking meeting" mode: all changes are local until Save.
   const [localZoneMap, setLocalZoneMap] = useState<Record<string, string> | null>(null);
   // Undo: in meeting mode = stack of previous localZoneMap snapshots; outside = last move only.
   const [zoneMapHistory, setZoneMapHistory] = useState<Record<string, string>[]>([]);
   const [lastMove, setLastMove] = useState<{ workerId: string; previousPostId: string } | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [showSaveBookingModal, setShowSaveBookingModal] = useState(false);
+  const [saveBookingName, setSaveBookingName] = useState('');
+  const [saveBookingEffectiveDate, setSaveBookingEffectiveDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [bookingError, setBookingError] = useState('');
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
+  const [replacementPostId, setReplacementPostId] = useState<string | null>(null);
+  const [replacementByPostId, setReplacementByPostId] = useState<Record<string, ReplacementSlot>>({});
+  const [replacementSaveError, setReplacementSaveError] = useState('');
+  const [replacementSaving, setReplacementSaving] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -78,6 +91,45 @@ export default function WorkAllocation() {
     fetchWorkers();
     fetchPosts();
   }, [fetchWorkers, fetchPosts]);
+
+  const fetchBookings = useCallback(async () => {
+    try {
+      const res = await apiClient.get<Booking[]>('/bookings');
+      setBookings(res.data || []);
+    } catch {
+      setBookings([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
+
+  useEffect(() => {
+    if (!selectedBookingId) {
+      setReplacementByPostId({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiClient.get<BookingReplacement[]>(`/bookings/${selectedBookingId}/replacements`);
+        const list = res.data ?? [];
+        const byPost: Record<string, ReplacementSlot> = {};
+        list.forEach((r) => {
+          byPost[r.postId] = {
+            r1: r.replacement1WorkerId ?? null,
+            r2: r.replacement2WorkerId ?? null,
+            r3: r.replacement3WorkerId ?? null,
+          };
+        });
+        if (!cancelled) setReplacementByPostId(byPost);
+      } catch {
+        if (!cancelled) setReplacementByPostId({});
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedBookingId]);
 
   useEffect(() => {
     const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -183,19 +235,99 @@ export default function WorkAllocation() {
   const handleStart = () => {
     setZoneMapHistory([]);
     setLocalZoneMap(Object.fromEntries(workers.map((w) => [w.id, UNASSIGNED_ZONE])));
+    setActiveBookingId(null);
   };
 
-  const handleSave = async () => {
+  // Save current arrangement as a named booking (does not change workers)
+  const handleSaveAsBooking = async () => {
     if (!localZoneMap) return;
-    for (const w of workers) {
-      const z = localZoneMap[w.id] ?? UNASSIGNED_ZONE;
-      if (z !== UNASSIGNED_ZONE && z !== w.originalPostId) {
-        await updateWorkerOriginalPost(w.id, z);
-      }
+    const name = saveBookingName.trim();
+    if (!name) {
+      setBookingError('Veuillez saisir un nom pour le booking.');
+      return;
     }
-    await fetchWorkers();
-    setLocalZoneMap(null);
-    setZoneMapHistory([]);
+    setBookingError('');
+    const assignments = workers
+      .filter((w) => {
+        const z = localZoneMap[w.id] ?? UNASSIGNED_ZONE;
+        return z !== UNASSIGNED_ZONE;
+      })
+      .map((w) => ({ workerId: w.id, postId: localZoneMap![w.id]! }));
+    try {
+      const res = await apiClient.post<Booking>('/bookings', {
+        name,
+        effectiveDate: saveBookingEffectiveDate,
+        assignments,
+      });
+      const newBookingId = res.data?.id;
+      if (newBookingId && Object.keys(replacementByPostId).length > 0) {
+        const replacements = Object.entries(replacementByPostId).map(([postId, slot]) => ({
+          postId,
+          replacement1WorkerId: slot.r1 || null,
+          replacement2WorkerId: slot.r2 || null,
+          replacement3WorkerId: slot.r3 || null,
+        }));
+        await apiClient.put(`/bookings/${newBookingId}/replacements`, { replacements });
+      }
+      await fetchBookings();
+      setShowSaveBookingModal(false);
+      setSaveBookingName('');
+      setLocalZoneMap(null);
+      setZoneMapHistory([]);
+      setReplacementPostId(null);
+    } catch (err: any) {
+      setBookingError(err?.response?.data?.error || err?.message || 'Erreur lors de la sauvegarde');
+    }
+  };
+
+  const saveReplacementsForSelectedBooking = useCallback(async () => {
+    if (!selectedBookingId) return;
+    setReplacementSaveError('');
+    setReplacementSaving(true);
+    try {
+      const replacements = Object.entries(replacementByPostId).map(([postId, slot]) => ({
+        postId,
+        replacement1WorkerId: slot.r1 || null,
+        replacement2WorkerId: slot.r2 || null,
+        replacement3WorkerId: slot.r3 || null,
+      }));
+      await apiClient.put(`/bookings/${selectedBookingId}/replacements`, { replacements });
+      await fetchBookings();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error ?? err?.message ?? 'Erreur lors de l\'enregistrement des remplaçants';
+      setReplacementSaveError(Array.isArray(msg) ? JSON.stringify(msg) : String(msg));
+    } finally {
+      setReplacementSaving(false);
+    }
+  }, [selectedBookingId, replacementByPostId]);
+
+  const handleActivateBooking = async (bookingId: string) => {
+    setActivatingId(bookingId);
+    setSelectedBookingId(bookingId);
+    try {
+      await apiClient.post(`/bookings/${bookingId}/activate`);
+      await fetchWorkers();
+      setActiveBookingId(bookingId);
+    } catch (err: any) {
+      alert(err?.response?.data?.error || err?.message || 'Erreur lors de l\'activation');
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
+  const handleDeleteBooking = async (bookingId: string, bookingName: string) => {
+    if (!confirm(`Supprimer le booking « ${bookingName} » ?`)) return;
+    setDeletingId(bookingId);
+    if (selectedBookingId === bookingId) setSelectedBookingId(null);
+    if (activeBookingId === bookingId) setActiveBookingId(null);
+    try {
+      await apiClient.delete(`/bookings/${bookingId}`);
+      await fetchBookings();
+    } catch (err: any) {
+      alert(err?.response?.data?.error || err?.message || 'Erreur lors de la suppression');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleCancel = () => {
@@ -222,33 +354,9 @@ export default function WorkAllocation() {
   const inMeeting = localZoneMap !== null;
 
   const handlePrintBooking = () => {
-    const unassigned = getUnassignedWorkers();
     const zoneCards: string[] = [];
 
-    // Non assignés
-    const unassignedCard = `
-      <div class="zone-card">
-        <div class="zone-title">Non assignés</div>
-        <div class="zone-workers">
-          ${unassigned.length > 0
-            ? unassigned
-                .map(
-                  (w) => {
-                    const color = (WorkerTypeColors as Record<string, string>)[w.type] || '#e5e7eb';
-                    const originalName = w.originalPost?.name ?? '-';
-                    return `<div class="worker-card" style="background-color:${color}20;border-left:3px solid ${color};">
-                      <div class="worker-name">${w.name}</div>
-                      <div class="worker-meta">${originalName} (${w.anciennete})</div>
-                    </div>`;
-                  }
-                )
-                .join('')
-            : '<span class="text-gray-400 italic">Vide</span>'}
-        </div>
-      </div>`;
-    zoneCards.push(unassignedCard);
-
-    // Each post
+    // Only post zones (non-assignés excluded from print)
     for (const post of posts) {
       const postWorkers = getWorkersForPost(post.id);
       const card = `
@@ -263,8 +371,8 @@ export default function WorkAllocation() {
                     const color = (WorkerTypeColors as Record<string, string>)[w.type] || '#e5e7eb';
                     const originalName = w.originalPost?.name ?? '-';
                     return `<div class="worker-card" style="background-color:${color}20;border-left:3px solid ${color};">
-                      <div class="worker-name">${w.name}</div>
-                      <div class="worker-meta">${originalName} (${w.anciennete})</div>
+                      <div class="worker-name">(${w.anciennete}) ${w.name}</div>
+                      <div class="worker-meta">${originalName}</div>
                     </div>`;
                   }
                 )
@@ -276,13 +384,44 @@ export default function WorkAllocation() {
     }
 
     const title = 'Booking – Répartition par zone';
-    const dateStr = new Date().toLocaleDateString('fr-FR');
+    const selectedBooking = selectedBookingId ? bookings.find((x) => x.id === selectedBookingId) : null;
+    const effectiveDateStr = selectedBooking
+      ? new Date(selectedBooking.effectiveDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    const replacementEntries = Object.entries(replacementByPostId).filter(
+      ([, slot]) => slot.r1 || slot.r2 || slot.r3
+    );
+    const replacementRows = replacementEntries
+      .map(([postId, slot]) => {
+        const post = posts.find((p) => p.id === postId);
+        const w1 = slot.r1 ? workers.find((w) => w.id === slot.r1) : null;
+        const w2 = slot.r2 ? workers.find((w) => w.id === slot.r2) : null;
+        const w3 = slot.r3 ? workers.find((w) => w.id === slot.r3) : null;
+        return `<tr><td class="print-repl-post">${post?.name ?? postId}</td><td>${w1 ? `(${w1.anciennete}) ${w1.name}` : '—'}</td><td>${w2 ? `(${w2.anciennete}) ${w2.name}` : '—'}</td><td>${w3 ? `(${w3.anciennete}) ${w3.name}` : '—'}</td></tr>`;
+      })
+      .join('');
+
+    const replacementsSection =
+      replacementRows.length > 0
+        ? `
+    <div class="print-page-break"></div>
+    <div class="print-header">Remplaçants</div>
+    <div class="print-effective">Date de début d'exécution : ${effectiveDateStr}</div>
+    <table class="print-repl-table">
+      <thead><tr><th>Poste</th><th>Remplaçant 1</th><th>Remplaçant 2</th><th>Remplaçant 3</th></tr></thead>
+      <tbody>${replacementRows}</tbody>
+    </table>`
+        : '';
+
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
     <style>
+      @page { size: landscape; }
       *{box-sizing:border-box;}
       body{font-family:sans-serif;padding:1rem;margin:0;background:#f3f4f6;}
-      .print-header{font-size:1.25rem;font-weight:700;margin-bottom:0.5rem;}
-      .print-date{color:#6b7280;font-size:0.875rem;margin-bottom:1rem;}
+      .print-header{font-size:1.25rem;font-weight:700;margin-bottom:0.35rem;}
+      .print-date{color:#6b7280;font-size:0.875rem;margin-bottom:0.25rem;}
+      .print-effective{color:#111;font-size:0.9rem;font-weight:600;margin-bottom:1rem;}
       .zones{display:flex;flex-wrap:wrap;gap:0.75rem;}
       .zone-card{background:#fff;border-radius:0.5rem;padding:0.75rem;min-width:180px;max-width:280px;box-shadow:0 1px 3px rgba(0,0,0,0.1);}
       .zone-title{font-weight:600;font-size:0.95rem;margin-bottom:0.25rem;}
@@ -291,11 +430,17 @@ export default function WorkAllocation() {
       .worker-card{border-radius:0.25rem;padding:0.35rem 0.5rem;font-size:10px;line-height:1.2;min-width:90px;}
       .worker-name{font-weight:500;color:#111;}
       .worker-meta{color:#4b5563;font-size:9px;}
+      .print-page-break{page-break-before:always;}
+      .print-repl-table{border-collapse:collapse;margin-top:0.5rem;width:100%;max-width:600px;}
+      .print-repl-table th,.print-repl-table td{border:1px solid #d1d5db;padding:0.35rem 0.5rem;text-align:left;font-size:11px;}
+      .print-repl-table th{background:#f3f4f6;font-weight:600;}
+      .print-repl-post{font-weight:500;}
     </style>
     </head><body>
     <div class="print-header">${title}</div>
-    <div class="print-date">${dateStr}</div>
+    <div class="print-effective">Date de début d'exécution : ${effectiveDateStr}</div>
     <div class="zones">${zoneCards.join('')}</div>
+    ${replacementsSection}
     </body></html>`;
 
     const w = window.open('', '_blank');
@@ -337,10 +482,10 @@ export default function WorkAllocation() {
             <>
               <button
                 type="button"
-                onClick={handleSave}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                onClick={() => { setSaveBookingName(''); setSaveBookingEffectiveDate(new Date().toISOString().slice(0, 10)); setBookingError(''); setShowSaveBookingModal(true); }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
-                Enregistrer
+                Sauvegarder le booking
               </button>
               <button
                 type="button"
@@ -353,34 +498,81 @@ export default function WorkAllocation() {
           )}
           <button
             type="button"
-            onClick={() => setShowWorkerModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Créer Travailleur
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowPostModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-          >
-            Créer Poste
-          </button>
-          <button
-            type="button"
             onClick={handlePrintBooking}
             className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700"
             title="Imprimer la répartition actuelle"
           >
             Imprimer
           </button>
+          {selectedBookingId && (
+            <Link
+              to={`/replacements?bookingId=${selectedBookingId}`}
+              className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700"
+            >
+              Voir remplacements
+            </Link>
+          )}
         </div>
       </div>
 
       <p className="text-sm text-gray-600 mb-4">
         {inMeeting
-          ? 'Réunion en cours : répartissez les travailleurs par zone, puis cliquez sur Enregistrer.'
-          : 'Répartition actuelle par zone originelle. Cliquez sur Commencer le booking pour lancer une réunion (tous en non assignés), puis Enregistrer pour sauvegarder.'}
+          ? 'Réunion en cours : répartissez les travailleurs par zone, puis Sauvegarder le booking pour enregistrer. Vous pourrez sélectionner et appliquer un booking plus tard dans la liste.'
+          : 'Répartition actuelle par zone originelle. Cliquez sur Commencer le booking pour lancer une réunion, puis Sauvegarder le booking. Sélectionnez un booking dans la liste et cliquez sur Appliquer pour l\'activer.'}
       </p>
+
+      {bookings.length > 0 && (
+        <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Bookings enregistrés</h2>
+          <div className="flex flex-wrap gap-2">
+            {bookings.map((b) => (
+              <div
+                key={b.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedBookingId(b.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBookingId(b.id); } }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md border shadow-sm cursor-pointer ${
+                  activeBookingId === b.id
+                    ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500'
+                    : selectedBookingId === b.id
+                      ? 'bg-indigo-50 border-indigo-400 ring-1 ring-indigo-400'
+                      : 'bg-white border-gray-200 hover:bg-gray-50'
+                }`}
+                title={activeBookingId === b.id ? 'Booking actif (répartition appliquée)' : "Sélectionner pour l'impression"}
+              >
+                {activeBookingId === b.id && (
+                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Actif</span>
+                )}
+                <span className="text-sm font-medium text-gray-800">{b.name}</span>
+                <span className="text-xs text-gray-500">
+                  Début : {new Date(b.effectiveDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleActivateBooking(b.id); }}
+                  disabled={activatingId === b.id}
+                  className="px-2 py-1 text-xs font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {activatingId === b.id ? '…' : 'Appliquer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleDeleteBooking(b.id, b.name); }}
+                  disabled={deletingId === b.id}
+                  className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
+                  title="Supprimer le booking"
+                  aria-label="Supprimer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <DndContext
         sensors={sensors}
@@ -388,38 +580,149 @@ export default function WorkAllocation() {
         onDragStart={wrapDragStart(handleDragStart)}
         onDragEnd={wrapDragEnd(handleDragEnd)}
       >
-        <div className="h-[calc(100vh-220px)] min-h-[400px] overflow-y-auto">
-          <div
-            className="grid gap-2 auto-rows-min p-1"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))' }}
-          >
-            <UnassignedColumn workers={getUnassignedWorkers()} postId={UNASSIGNED_ZONE} />
-            {posts.map((post) => (
-              <PostColumn
-                key={post.id}
-                post={post}
-                workers={getWorkersForPost(post.id)}
-              />
-            ))}
+        <div className={`flex gap-4 h-[calc(100vh-220px)] min-h-[400px] ${replacementPostId ? '' : ''}`}>
+          <div className="flex-1 min-w-0 overflow-y-auto">
+            <div
+              className="grid gap-2 auto-rows-min p-1"
+              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))' }}
+            >
+              <UnassignedColumn workers={getUnassignedWorkers()} postId={UNASSIGNED_ZONE} />
+              {posts.map((post) => (
+                <PostColumn
+                  key={post.id}
+                  post={post}
+                  workers={getWorkersForPost(post.id)}
+                  onReplacementClick={localZoneMap != null || selectedBookingId != null ? () => setReplacementPostId(post.id) : undefined}
+                />
+              ))}
+            </div>
           </div>
+
+          {replacementPostId && (() => {
+            const post = posts.find((p) => p.id === replacementPostId);
+            const slot = replacementByPostId[replacementPostId] ?? { r1: null, r2: null, r3: null };
+            const availableWorkers = workers;
+            const canSaveToBooking = !!selectedBookingId;
+            return (
+              <div className="w-72 shrink-0 flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <div className="px-3 py-2 bg-violet-50 border-b border-violet-100">
+                  <h3 className="text-sm font-semibold text-gray-800">Remplaçants pour {post?.name ?? '…'}</h3>
+                </div>
+                <div className="p-3 flex-1 min-h-0 overflow-y-auto space-y-3">
+                  {(['r1', 'r2', 'r3'] as const).map((key, idx) => {
+                    const value = slot[key];
+                    const otherIds = (['r1', 'r2', 'r3'] as const).filter((k) => k !== key).map((k) => slot[k]).filter(Boolean) as string[];
+                    const options = availableWorkers.filter((w) => w.id === value || !otherIds.includes(w.id));
+                    return (
+                      <div key={key}>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Remplaçant {idx + 1}</label>
+                        <select
+                          value={value ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value || null;
+                            setReplacementByPostId((prev) => ({
+                              ...prev,
+                              [replacementPostId]: { ...(prev[replacementPostId] ?? { r1: null, r2: null, r3: null }), [key]: v },
+                            }));
+                          }}
+                          className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5"
+                        >
+                          <option value="">— Aucun —</option>
+                          {options.map((w) => (
+                            <option key={w.id} value={w.id}>({w.anciennete}) {w.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                  {!canSaveToBooking && (
+                    <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
+                      Sauvegardez le booking pour enregistrer les remplaçants.
+                    </p>
+                  )}
+                  {replacementSaveError && (
+                    <p className="text-xs text-red-600 bg-red-50 p-2 rounded">{replacementSaveError}</p>
+                  )}
+                </div>
+                <div className="p-3 border-t border-gray-100 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setReplacementPostId(null); setReplacementSaveError(''); }}
+                    className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                  >
+                    Fermer
+                  </button>
+                  {canSaveToBooking && (
+                    <button
+                      type="button"
+                      onClick={saveReplacementsForSelectedBooking}
+                      disabled={replacementSaving}
+                      className="px-3 py-1.5 text-sm text-white bg-violet-600 rounded-md hover:bg-violet-700 disabled:opacity-50"
+                    >
+                      {replacementSaving ? 'Enregistrement…' : 'Enregistrer'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <DragOverlay>
           {activeWorker ? (
             <div className="bg-white p-3 rounded-lg shadow-lg border-2 border-blue-500 text-xs">
-              <div className="font-semibold text-gray-900">{activeWorker.name}</div>
+              <div className="font-semibold text-gray-900">({activeWorker.anciennete}) {activeWorker.name}</div>
               <div className="text-gray-600 text-[10px] mt-0.5">
-                {activeWorker.originalPost?.name ?? '-'} ({activeWorker.anciennete})
+                {activeWorker.originalPost?.name ?? '-'}
               </div>
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
 
-      {showWorkerModal && (
-        <CreateWorkerModal onClose={() => setShowWorkerModal(false)} posts={posts} />
+      {showSaveBookingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSaveBookingModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Sauvegarder le booking</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              La répartition actuelle sera enregistrée. Les postes des travailleurs ne seront pas modifiés tant que vous n&apos;aurez pas cliqué sur « Appliquer » pour ce booking.
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nom du booking</label>
+            <input
+              type="text"
+              value={saveBookingName}
+              onChange={(e) => setSaveBookingName(e.target.value)}
+              placeholder="ex. Semaine 12 mars"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-3"
+              autoFocus
+            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date de début d&apos;exécution</label>
+            <input
+              type="date"
+              value={saveBookingEffectiveDate}
+              onChange={(e) => setSaveBookingEffectiveDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-3"
+            />
+            {bookingError && <p className="text-sm text-red-600 mb-2">{bookingError}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowSaveBookingModal(false); setBookingError(''); }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAsBooking}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              >
+                Sauvegarder
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-      {showPostModal && <CreatePostModal onClose={() => setShowPostModal(false)} />}
     </div>
   );
 }

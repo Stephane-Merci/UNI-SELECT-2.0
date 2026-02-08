@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import apiClient from '../api/client';
 import { Worker, Post } from '../types';
+import CreateWorkerModal from '../components/CreateWorkerModal';
+import CreatePostModal from '../components/CreatePostModal';
 
 export default function Admin() {
   const {
@@ -12,6 +14,11 @@ export default function Admin() {
     updatePost,
     deletePost,
   } = useStore();
+
+  const [workerSearch, setWorkerSearch] = useState('');
+  const [postSearch, setPostSearch] = useState('');
+  const [showWorkerModal, setShowWorkerModal] = useState(false);
+  const [showPostModal, setShowPostModal] = useState(false);
 
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [postForm, setPostForm] = useState<{ name: string; description: string }>({
@@ -39,6 +46,27 @@ export default function Admin() {
     fetchWorkers();
     fetchPosts();
   }, [fetchWorkers, fetchPosts]);
+
+  const filteredWorkers = useMemo(() => {
+    const q = workerSearch.trim().toLowerCase();
+    if (!q) return workers;
+    return workers.filter(
+      (w) =>
+        w.name.toLowerCase().includes(q) ||
+        w.anciennete.toLowerCase().includes(q) ||
+        (w.originalPost?.name ?? '').toLowerCase().includes(q)
+    );
+  }, [workers, workerSearch]);
+
+  const filteredPosts = useMemo(() => {
+    const q = postSearch.trim().toLowerCase();
+    if (!q) return posts;
+    return posts.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.description ?? '').toLowerCase().includes(q)
+    );
+  }, [posts, postSearch]);
 
   const startEditPost = (post: Post) => {
     setEditingPostId(post.id);
@@ -146,7 +174,23 @@ export default function Admin() {
 
       {/* Workers management */}
       <section>
-        <h2 className="text-xl font-semibold text-gray-800 mb-3">Travailleurs</h2>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <h2 className="text-xl font-semibold text-gray-800">Travailleurs</h2>
+          <input
+            type="text"
+            placeholder="Rechercher (nom, ancienneté, poste…)"
+            value={workerSearch}
+            onChange={(e) => setWorkerSearch(e.target.value)}
+            className="flex-1 min-w-[200px] px-3 py-1.5 text-sm border border-gray-300 rounded-md"
+          />
+          <button
+            type="button"
+            onClick={() => setShowWorkerModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+          >
+            Créer Travailleur
+          </button>
+        </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow border border-gray-200">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
@@ -158,7 +202,7 @@ export default function Admin() {
               </tr>
             </thead>
             <tbody>
-              {workers.map((w) => (
+              {filteredWorkers.map((w) => (
                 <tr key={w.id} className="border-t border-gray-100">
                   <td className="px-3 py-2">
                     {editingWorkerId === w.id ? (
@@ -247,7 +291,23 @@ export default function Admin() {
 
       {/* Posts management */}
       <section>
-        <h2 className="text-xl font-semibold text-gray-800 mb-3">Postes</h2>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <h2 className="text-xl font-semibold text-gray-800">Postes</h2>
+          <input
+            type="text"
+            placeholder="Rechercher (nom, description…)"
+            value={postSearch}
+            onChange={(e) => setPostSearch(e.target.value)}
+            className="flex-1 min-w-[200px] px-3 py-1.5 text-sm border border-gray-300 rounded-md"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPostModal(true)}
+            className="px-4 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700"
+          >
+            Créer Poste
+          </button>
+        </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow border border-gray-200">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
@@ -258,7 +318,7 @@ export default function Admin() {
               </tr>
             </thead>
             <tbody>
-              {posts.map((p) => (
+              {filteredPosts.map((p) => (
                 <tr key={p.id} className="border-t border-gray-100">
                   <td className="px-3 py-2">
                     {editingPostId === p.id ? (
@@ -383,6 +443,11 @@ export default function Admin() {
           </form>
         </div>
       </section>
+
+      {showWorkerModal && (
+        <CreateWorkerModal onClose={() => setShowWorkerModal(false)} posts={posts} />
+      )}
+      {showPostModal && <CreatePostModal onClose={() => setShowPostModal(false)} />}
     </div>
   );
 }

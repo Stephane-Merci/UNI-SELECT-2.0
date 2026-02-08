@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   DndContext,
   DragOverlay,
@@ -21,10 +22,10 @@ import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
 import { Worker, Post, WorkerType, WorkerTypeColors, ORIGIN_TYPES } from '../types';
 import PostColumn from '../components/PostColumn';
 import WorkerCard, { getWorkerIdFromDragId, PRESENCE_DRAG_PREFIX } from '../components/WorkerCard';
-import CreateWorkerModal from '../components/CreateWorkerModal';
-import CreatePostModal from '../components/CreatePostModal';
 import PlanManagementModal from '../components/PlanManagementModal';
 import { io } from 'socket.io-client';
+import apiClient from '../api/client';
+import type { Booking, BookingReplacement } from '../types';
 
 // 6 main availabilities — search filters only these.
 const MAIN_PRESENCE_GROUPS: Record<string, WorkerType[]> = {
@@ -255,8 +256,6 @@ export default function PlanManagement() {
   } = useStore();
 
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);
-  const [showWorkerModal, setShowWorkerModal] = useState(false);
-  const [showPostModal, setShowPostModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(50); // Percentage
   const [isResizing, setIsResizing] = useState(false);
@@ -397,7 +396,8 @@ export default function PlanManagement() {
     // Check if dropping on a post
     const post = posts.find((p) => p.id === overId);
     if (post) {
-      setLastPlanAction({ workerId, previousPostId: null, previousPresenceType });
+      // Keep previousPostId so Undo can restore: if worker was on another post, put them back there; if from fiche de présence, previousPostId is null and Undo will remove assignment
+      setLastPlanAction({ workerId, previousPostId, previousPresenceType });
       // When assigning from presence/absence (Absent, Vacances, etc.) to a post, set presence
       // back to the worker's origin type (e.g. PERMANENT_JOUR) so they're shown as "back to work"
       if (worker) {
@@ -495,8 +495,46 @@ export default function PlanManagement() {
       const pt = presenceMap[w.id] ?? w.type;
       return permanentOnly.includes(pt);
     });
+
+    // Replacements: if a post has all its workers absent, assign replacement workers to that post instead of their own
+    const replacementWorkerToPost: Record<string, string> = {};
+    try {
+      const bookingsRes = await apiClient.get<Booking[]>('/bookings');
+      const bookingsList = bookingsRes.data ?? [];
+      const planDate = currentPlan.date ? new Date(currentPlan.date).getTime() : null;
+      const chosenBooking =
+        planDate != null
+          ? bookingsList.find((b) => new Date(b.effectiveDate).getTime() === planDate) ?? bookingsList[0]
+          : bookingsList[0];
+      if (chosenBooking) {
+        const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
+        const replList = replRes.data ?? [];
+        for (const r of replList) {
+          const postId = r.postId;
+          const workersOnPost = workers.filter((w) => w.originalPostId === postId);
+          const allAbsent =
+            workersOnPost.length > 0 &&
+            workersOnPost.every((w) => {
+              const pt = presenceMap[w.id] ?? w.type;
+              return ATTENDANCE_PRESENCE_TYPES.has(pt);
+            });
+          if (allAbsent && workersOnPost.length > 0) {
+            const ids = [r.replacement1WorkerId, r.replacement2WorkerId, r.replacement3WorkerId].filter(
+              (id): id is string => !!id
+            );
+            ids.forEach((workerId) => {
+              replacementWorkerToPost[workerId] = postId;
+            });
+          }
+        }
+      }
+    } catch {
+      // ignore: proceed with normal auto-assign without replacement overrides
+    }
+
     for (const w of toAssign) {
-      await assignWorker(currentPlan.id, w.id, w.originalPostId);
+      const targetPostId = replacementWorkerToPost[w.id] ?? w.originalPostId;
+      await assignWorker(currentPlan.id, w.id, targetPostId);
     }
   };
 
@@ -528,23 +566,17 @@ export default function PlanManagement() {
                 Annuler l&apos;action
               </button>
             )}
+            <Link
+              to="/replacements"
+              className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700"
+            >
+              Voir remplacements
+            </Link>
             <button
               onClick={() => setShowPlanModal(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               {currentPlan ? 'Gérer les Plans' : 'Créer un Plan'}
-            </button>
-            <button
-              onClick={() => setShowWorkerModal(true)}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            >
-              Créer Travailleur
-            </button>
-            <button
-              onClick={() => setShowPostModal(true)}
-              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-            >
-              Créer Poste
             </button>
           </div>
         </div>
@@ -600,9 +632,9 @@ export default function PlanManagement() {
           <DragOverlay>
             {activeWorker ? (
               <div className="bg-white p-2 rounded-lg shadow-lg border-2 border-blue-500 text-xs">
-                <div className="font-semibold text-gray-900">{activeWorker.name}</div>
+                <div className="font-semibold text-gray-900">({activeWorker.anciennete}) {activeWorker.name}</div>
                 <div className="text-gray-600 text-[10px] mt-0.5">
-                  {activeWorker.originalPost?.name ?? '-'} ({activeWorker.anciennete})
+                  {activeWorker.originalPost?.name ?? '-'}
                 </div>
               </div>
             ) : null}
@@ -625,17 +657,6 @@ export default function PlanManagement() {
       )}
 
       {/* Modals */}
-      {showWorkerModal && (
-        <CreateWorkerModal
-          onClose={() => setShowWorkerModal(false)}
-          posts={posts}
-        />
-      )}
-
-      {showPostModal && (
-        <CreatePostModal onClose={() => setShowPostModal(false)} />
-      )}
-
       {showPlanModal && (
         <PlanManagementModal
           onClose={() => setShowPlanModal(false)}
