@@ -13,6 +13,15 @@ const createBookingSchema = z.object({
   })),
 });
 
+const updateBookingSchema = z.object({
+  name: z.string().min(1).optional(),
+  effectiveDate: z.string().min(1).optional(),
+  assignments: z.array(z.object({
+    workerId: z.string().min(1),
+    postId: z.string().min(1),
+  })),
+});
+
 // List all bookings (newest first)
 router.get('/', async (req, res) => {
   try {
@@ -30,8 +39,9 @@ router.get('/', async (req, res) => {
     res.json(bookings);
   } catch (error: any) {
     console.error('Bookings fetch error:', error?.message ?? error);
-    const msg = error?.code === 'P2021' || error?.message?.includes('does not exist')
-      ? 'Booking tables missing. Run: npx prisma migrate deploy'
+    const isMissingTable = error?.code === 'P2021' || /does not exist|relation.*does not exist/i.test(String(error?.message ?? ''));
+    const msg = isMissingTable
+      ? 'Booking tables missing. Run: npx prisma migrate deploy (or prisma/create_booking_tables_if_missing.sql)'
       : 'Failed to fetch bookings';
     res.status(500).json({ error: msg });
   }
@@ -43,6 +53,7 @@ const putReplacementsSchema = z.object({
     replacement1WorkerId: z.string().nullable().optional(),
     replacement2WorkerId: z.string().nullable().optional(),
     replacement3WorkerId: z.string().nullable().optional(),
+    replacement4WorkerId: z.string().nullable().optional(),
   })),
 });
 
@@ -56,6 +67,7 @@ router.get('/:id/replacements', async (req, res) => {
         replacement1Worker: true,
         replacement2Worker: true,
         replacement3Worker: true,
+        replacement4Worker: true,
       },
     });
     res.json(list);
@@ -89,6 +101,7 @@ router.put('/:id/replacements', async (req, res) => {
           replacement1WorkerId: toWorkerId(r.replacement1WorkerId ?? undefined),
           replacement2WorkerId: toWorkerId(r.replacement2WorkerId ?? undefined),
           replacement3WorkerId: toWorkerId(r.replacement3WorkerId ?? undefined),
+          replacement4WorkerId: toWorkerId(r.replacement4WorkerId ?? undefined),
         })),
       });
     }
@@ -99,6 +112,7 @@ router.put('/:id/replacements', async (req, res) => {
         replacement1Worker: true,
         replacement2Worker: true,
         replacement3Worker: true,
+        replacement4Worker: true,
       },
     });
     res.json(list);
@@ -132,6 +146,61 @@ router.get('/:id', async (req, res) => {
     res.json(booking);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch booking' });
+  }
+});
+
+// Update a booking (replace assignments; unassigned workers are those not in assignments)
+router.put('/:id', async (req, res) => {
+  try {
+    const booking = await prisma.booking.findUnique({ where: { id: req.params.id } });
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    const data = updateBookingSchema.parse(req.body);
+    if (data.name !== undefined || data.effectiveDate !== undefined) {
+      const updatePayload: { name?: string; effectiveDate?: Date } = {};
+      if (data.name !== undefined) updatePayload.name = data.name;
+      if (data.effectiveDate !== undefined) {
+        const effectiveDate = new Date(data.effectiveDate);
+        if (isNaN(effectiveDate.getTime())) {
+          return res.status(400).json({ error: 'Invalid effectiveDate' });
+        }
+        updatePayload.effectiveDate = effectiveDate;
+      }
+      await prisma.booking.update({
+        where: { id: req.params.id },
+        data: updatePayload,
+      });
+    }
+    if (data.assignments !== undefined) {
+      await prisma.bookingAssignment.deleteMany({ where: { bookingId: req.params.id } });
+      if (data.assignments.length > 0) {
+        await prisma.bookingAssignment.createMany({
+          data: data.assignments.map((a) => ({
+            bookingId: req.params.id,
+            workerId: a.workerId,
+            postId: a.postId,
+          })),
+        });
+      }
+    }
+    const updated = await prisma.booking.findUnique({
+      where: { id: req.params.id },
+      include: {
+        assignments: {
+          include: {
+            worker: { include: { originalPost: true } },
+            post: true,
+          },
+        },
+      },
+    });
+    res.json(updated);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors });
+    }
+    res.status(500).json({ error: 'Failed to update booking' });
   }
 });
 

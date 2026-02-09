@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
-import { Worker, Post, WorkerType, WorkerTypeColors, ORIGIN_TYPES } from '../types';
+import { Worker, Post, WorkerType, WorkerTypeColors, ORIGIN_TYPES, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR } from '../types';
 import PostColumn from '../components/PostColumn';
 import WorkerCard, { getWorkerIdFromDragId, PRESENCE_DRAG_PREFIX } from '../components/WorkerCard';
 import PlanManagementModal from '../components/PlanManagementModal';
@@ -260,6 +260,18 @@ export default function PlanManagement() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(50); // Percentage
   const [isResizing, setIsResizing] = useState(false);
   const [presenceSearchFilter, setPresenceSearchFilter] = useState('');
+  const [replacementPrompt, setReplacementPrompt] = useState<{
+    postId: string;
+    postName: string;
+    workerName: string;
+    workerAnciennete: string;
+    shift: 'jour' | 'soir';
+    options: { id: string; name: string; anciennete: string }[];
+  } | null>(null);
+  const [replacementPromptSelectedId, setReplacementPromptSelectedId] = useState<string | null>(null);
+  const [autoAssignReplacementPrompt, setAutoAssignReplacementPrompt] = useState<{
+    items: { postId: string; postName: string; workerIds: string[] }[];
+  } | null>(null);
   const [lastPlanAction, setLastPlanAction] = useState<{
     workerId: string;
     previousPostId: string | null;
@@ -390,6 +402,67 @@ export default function PlanManagement() {
           }
         }
       }
+
+      // Crucial check: if this worker was the only one from their shift on their post, and the post has replacements, prompt to choose a replacement
+      if (previousPostId && worker) {
+        const workerShift: 'jour' | 'soir' | null = WORKER_TYPES_JOUR.includes(worker.type)
+          ? 'jour'
+          : WORKER_TYPES_SOIR.includes(worker.type)
+            ? 'soir'
+            : null;
+        if (workerShift) {
+          const workersStillOnPost = workers.filter(
+            (w) => w.id !== workerId && assignmentMap[w.id] === previousPostId
+          );
+          const sameShiftStillOnPost = workersStillOnPost.filter((w) =>
+            workerShift === 'jour'
+              ? WORKER_TYPES_JOUR.includes(w.type)
+              : WORKER_TYPES_SOIR.includes(w.type)
+          );
+          if (sameShiftStillOnPost.length === 0) {
+            try {
+              const bookingsRes = await apiClient.get<Booking[]>('/bookings');
+              const bookingsList = bookingsRes.data ?? [];
+              const planDate = currentPlan.date ? new Date(currentPlan.date).getTime() : null;
+              const chosenBooking =
+                planDate != null
+                  ? bookingsList.find((b) => new Date(b.effectiveDate).getTime() === planDate) ?? bookingsList[0]
+                  : bookingsList[0];
+              if (chosenBooking) {
+                const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
+                const replList = replRes.data ?? [];
+                const row = replList.find((r) => r.postId === previousPostId);
+                if (row) {
+                  const ids =
+                    workerShift === 'jour'
+                      ? [row.replacement1WorkerId, row.replacement2WorkerId]
+                      : [row.replacement3WorkerId, row.replacement4WorkerId];
+                  const optionIds = (ids.filter((id): id is string => !!id) as string[]).filter(Boolean);
+                  const options = optionIds
+                    .map((id) => workers.find((w) => w.id === id))
+                    .filter((w): w is Worker => !!w)
+                    .map((w) => ({ id: w.id, name: w.name, anciennete: w.anciennete }));
+                  if (options.length > 0) {
+                    const post = posts.find((p) => p.id === previousPostId);
+                    setReplacementPrompt({
+                      postId: previousPostId,
+                      postName: post?.name ?? previousPostId,
+                      workerName: worker.name,
+                      workerAnciennete: worker.anciennete,
+                      shift: workerShift,
+                      options,
+                    });
+                    setReplacementPromptSelectedId(options[0]?.id ?? null);
+                    return;
+                  }
+                }
+              }
+            } catch (e) {
+              console.error('Replacement check failed:', e);
+            }
+          }
+        }
+      }
       return;
     }
 
@@ -496,8 +569,13 @@ export default function PlanManagement() {
       return permanentOnly.includes(pt);
     });
 
-    // Replacements: if a post has all its workers absent, assign replacement workers to that post instead of their own
-    const replacementWorkerToPost: Record<string, string> = {};
+    // Assign every worker to their original post only — do NOT auto-assign replacements to replacement posts
+    for (const w of toAssign) {
+      await assignWorker(currentPlan.id, w.id, w.originalPostId);
+    }
+
+    // After auto-assign, detect posts that have all their workers absent but have replacements defined.
+    // Show a popup so the manager can choose whether to assign those replacements.
     try {
       const bookingsRes = await apiClient.get<Booking[]>('/bookings');
       const bookingsList = bookingsRes.data ?? [];
@@ -509,6 +587,7 @@ export default function PlanManagement() {
       if (chosenBooking) {
         const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
         const replList = replRes.data ?? [];
+        const items: { postId: string; postName: string; workerIds: string[] }[] = [];
         for (const r of replList) {
           const postId = r.postId;
           const workersOnPost = workers.filter((w) => w.originalPostId === postId);
@@ -519,22 +598,21 @@ export default function PlanManagement() {
               return ATTENDANCE_PRESENCE_TYPES.has(pt);
             });
           if (allAbsent && workersOnPost.length > 0) {
-            const ids = [r.replacement1WorkerId, r.replacement2WorkerId, r.replacement3WorkerId].filter(
+            const workerIds = [r.replacement1WorkerId, r.replacement2WorkerId, r.replacement3WorkerId, r.replacement4WorkerId].filter(
               (id): id is string => !!id
             );
-            ids.forEach((workerId) => {
-              replacementWorkerToPost[workerId] = postId;
-            });
+            if (workerIds.length > 0) {
+              const post = posts.find((p) => p.id === postId);
+              items.push({ postId, postName: post?.name ?? postId, workerIds });
+            }
           }
+        }
+        if (items.length > 0) {
+          setAutoAssignReplacementPrompt({ items });
         }
       }
     } catch {
-      // ignore: proceed with normal auto-assign without replacement overrides
-    }
-
-    for (const w of toAssign) {
-      const targetPostId = replacementWorkerToPost[w.id] ?? w.originalPostId;
-      await assignWorker(currentPlan.id, w.id, targetPostId);
+      // ignore: no popup if bookings/replacements fail
     }
   };
 
@@ -666,6 +744,107 @@ export default function PlanManagement() {
           onPlanCreate={createPlan}
           onPlanCopy={copyPlan}
         />
+      )}
+
+      {replacementPrompt && currentPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setReplacementPrompt(null)}>
+          <div
+            className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Remplaçant requis</h3>
+            <p className="text-sm text-gray-700 mb-3">
+              <span className="font-medium">({replacementPrompt.workerAnciennete}) {replacementPrompt.workerName}</span>
+              {' '}était le seul travailleur {replacementPrompt.shift === 'jour' ? 'du jour' : 'du soir'} sur le poste{' '}
+              <span className="font-medium">{replacementPrompt.postName}</span>.
+              <br />
+              Choisissez qui le remplace :
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Remplaçant</label>
+            <select
+              value={replacementPromptSelectedId ?? ''}
+              onChange={(e) => setReplacementPromptSelectedId(e.target.value || null)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-4"
+            >
+              {replacementPrompt.options.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  ({opt.anciennete}) {opt.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setReplacementPrompt(null); setReplacementPromptSelectedId(null); }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Ne pas affecter
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (replacementPromptSelectedId) {
+                    await assignWorker(currentPlan.id, replacementPromptSelectedId, replacementPrompt.postId);
+                    await fetchAssignments(currentPlan.id);
+                  }
+                  setReplacementPrompt(null);
+                  setReplacementPromptSelectedId(null);
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              >
+                Affecter le remplaçant
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {autoAssignReplacementPrompt && currentPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setAutoAssignReplacementPrompt(null)}>
+          <div
+            className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Remplaçants disponibles</h3>
+            <p className="text-sm text-gray-700 mb-4">
+              L&apos;assignement automatique a affecté chaque travailleur à son poste d&apos;origine. Certains postes
+              n&apos;ont plus de travailleurs présents (tous absents) mais ont des remplaçants définis dans le booking.
+              Souhaitez-vous assigner ces remplaçants aux postes concernés ?
+            </p>
+            <ul className="text-sm text-gray-600 mb-4 list-disc list-inside space-y-1">
+              {autoAssignReplacementPrompt.items.map(({ postId, postName, workerIds }) => (
+                <li key={postId}>
+                  <span className="font-medium">{postName}</span>
+                  {' '}({workerIds.length} remplaçant{workerIds.length > 1 ? 's' : ''})
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAutoAssignReplacementPrompt(null)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Ne pas assigner
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  for (const { postId, workerIds } of autoAssignReplacementPrompt.items) {
+                    for (const workerId of workerIds) {
+                      await assignWorker(currentPlan.id, workerId, postId);
+                    }
+                  }
+                  await fetchAssignments(currentPlan.id);
+                  setAutoAssignReplacementPrompt(null);
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              >
+                Assigner les remplaçants
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

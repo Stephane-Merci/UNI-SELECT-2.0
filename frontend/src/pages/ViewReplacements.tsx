@@ -98,9 +98,10 @@ export default function ViewReplacements() {
                 <thead>
                   <tr className="bg-gray-50">
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Poste</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant 1</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant 2</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant 3</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant du jour 1</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant du jour 2</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant du soir 1</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant du soir 2</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -115,6 +116,9 @@ export default function ViewReplacements() {
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700">
                         {r.replacement3Worker ? `(${r.replacement3Worker.anciennete}) ${r.replacement3Worker.name}` : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700">
+                        {r.replacement4Worker ? `(${r.replacement4Worker.anciennete}) ${r.replacement4Worker.name}` : '—'}
                       </td>
                     </tr>
                   ))}

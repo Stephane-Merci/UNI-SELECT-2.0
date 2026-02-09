@@ -18,20 +18,47 @@ import {
 } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
-import { Worker, WorkerTypeColors, Booking, BookingReplacement } from '../types';
+import { Worker, WorkerTypeColors, Booking, BookingReplacement, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR, WorkerType } from '../types';
 import PostColumn from '../components/PostColumn';
 import WorkerCard, { POST_DRAG_PREFIX, POST_DRAG_SEP } from '../components/WorkerCard';
 import { Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import apiClient from '../api/client';
 
-type ReplacementSlot = { r1: string | null; r2: string | null; r3: string | null };
+type ReplacementSlot = { r1: string | null; r2: string | null; r3: string | null; r4: string | null };
+const REPLACEMENT_LABELS: [keyof ReplacementSlot, string][] = [
+  ['r1', 'Remplaçant du jour 1'],
+  ['r2', 'Remplaçant du jour 2'],
+  ['r3', 'Remplaçant du soir 1'],
+  ['r4', 'Remplaçant du soir 2'],
+];
 
 const UNASSIGNED_ZONE = 'unassigned';
 
 // Booking: zones = posts (zone originel). Workers shown by current zone (originalPost or local meeting state).
 function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: string }) {
   const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_ZONE });
+  const workersJour = workers.filter((w) => WORKER_TYPES_JOUR.includes(w.type as WorkerType));
+  const workersSoir = workers.filter((w) => WORKER_TYPES_SOIR.includes(w.type as WorkerType));
+  const workersOther = workers.filter(
+    (w) => !WORKER_TYPES_JOUR.includes(w.type as WorkerType) && !WORKER_TYPES_SOIR.includes(w.type as WorkerType)
+  );
+  const sortByName = (a: Worker, b: Worker) => a.name.localeCompare(b.name, 'fr');
+  const renderBlock = (label: string, list: Worker[]) =>
+    list.length === 0 ? null : (
+      <div className="mb-2 last:mb-0">
+        <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">{label}</div>
+        <div className="space-y-0.5">
+          {list.map((worker) => (
+            <WorkerCard
+              key={worker.id}
+              worker={worker}
+              dragId={postId ? `${POST_DRAG_PREFIX}${postId}${POST_DRAG_SEP}${worker.id}` : undefined}
+            />
+          ))}
+        </div>
+      </div>
+    );
 
   return (
     <div
@@ -45,14 +72,20 @@ function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: stri
         items={workers.map((w) => (postId ? `${POST_DRAG_PREFIX}${postId}${POST_DRAG_SEP}${w.id}` : w.id))}
         strategy={verticalListSortingStrategy}
       >
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1">
-          {workers.map((worker) => (
-            <WorkerCard
-              key={worker.id}
-              worker={worker}
-              dragId={postId ? `${POST_DRAG_PREFIX}${postId}${POST_DRAG_SEP}${worker.id}` : undefined}
-            />
-          ))}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+          {renderBlock('Jour', [...workersJour].sort(sortByName))}
+          {workersJour.length > 0 && workersSoir.length > 0 && (
+            <div className="border-t border-gray-300 my-1.5" aria-hidden />
+          )}
+          {renderBlock('Soir', [...workersSoir].sort(sortByName))}
+          {workersOther.length > 0 && (
+            <>
+              {(workersJour.length > 0 || workersSoir.length > 0) && (
+                <div className="border-t border-gray-300 my-1.5" aria-hidden />
+              )}
+              {renderBlock('Autres', [...workersOther].sort(sortByName))}
+            </>
+          )}
         </div>
       </SortableContext>
     </div>
@@ -75,6 +108,7 @@ export default function WorkAllocation() {
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [replacementPostId, setReplacementPostId] = useState<string | null>(null);
   const [replacementByPostId, setReplacementByPostId] = useState<Record<string, ReplacementSlot>>({});
@@ -121,6 +155,7 @@ export default function WorkAllocation() {
             r1: r.replacement1WorkerId ?? null,
             r2: r.replacement2WorkerId ?? null,
             r3: r.replacement3WorkerId ?? null,
+            r4: r.replacement4WorkerId ?? null,
           };
         });
         if (!cancelled) setReplacementByPostId(byPost);
@@ -236,9 +271,27 @@ export default function WorkAllocation() {
     setZoneMapHistory([]);
     setLocalZoneMap(Object.fromEntries(workers.map((w) => [w.id, UNASSIGNED_ZONE])));
     setActiveBookingId(null);
+    setEditingBookingId(null);
   };
 
-  // Save current arrangement as a named booking (does not change workers)
+  // Load a saved booking into the grid to continue editing (assignments → posts; everyone else → non assignés)
+  const handleContinueBooking = async (booking: Booking) => {
+    const assignmentMap: Record<string, string> = {};
+    (booking.assignments ?? []).forEach((a) => {
+      assignmentMap[a.workerId] = a.postId;
+    });
+    const zoneMap: Record<string, string> = {};
+    workers.forEach((w) => {
+      zoneMap[w.id] = assignmentMap[w.id] ?? UNASSIGNED_ZONE;
+    });
+    setSelectedBookingId(booking.id);
+    setEditingBookingId(booking.id);
+    setLocalZoneMap(zoneMap);
+    setZoneMapHistory([]);
+    setReplacementPostId(null);
+  };
+
+  // Save current arrangement as a new booking or update existing (does not change workers)
   const handleSaveAsBooking = async () => {
     if (!localZoneMap) return;
     const name = saveBookingName.trim();
@@ -254,20 +307,38 @@ export default function WorkAllocation() {
       })
       .map((w) => ({ workerId: w.id, postId: localZoneMap![w.id]! }));
     try {
-      const res = await apiClient.post<Booking>('/bookings', {
-        name,
-        effectiveDate: saveBookingEffectiveDate,
-        assignments,
-      });
-      const newBookingId = res.data?.id;
-      if (newBookingId && Object.keys(replacementByPostId).length > 0) {
+      if (editingBookingId) {
+        await apiClient.put(`/bookings/${editingBookingId}`, {
+          name,
+          effectiveDate: saveBookingEffectiveDate,
+          assignments,
+        });
         const replacements = Object.entries(replacementByPostId).map(([postId, slot]) => ({
           postId,
           replacement1WorkerId: slot.r1 || null,
           replacement2WorkerId: slot.r2 || null,
           replacement3WorkerId: slot.r3 || null,
+          replacement4WorkerId: slot.r4 || null,
         }));
-        await apiClient.put(`/bookings/${newBookingId}/replacements`, { replacements });
+        await apiClient.put(`/bookings/${editingBookingId}/replacements`, { replacements });
+        setEditingBookingId(null);
+      } else {
+        const res = await apiClient.post<Booking>('/bookings', {
+          name,
+          effectiveDate: saveBookingEffectiveDate,
+          assignments,
+        });
+        const newBookingId = res.data?.id;
+        if (newBookingId && Object.keys(replacementByPostId).length > 0) {
+          const replacements = Object.entries(replacementByPostId).map(([postId, slot]) => ({
+            postId,
+            replacement1WorkerId: slot.r1 || null,
+            replacement2WorkerId: slot.r2 || null,
+            replacement3WorkerId: slot.r3 || null,
+            replacement4WorkerId: slot.r4 || null,
+          }));
+          await apiClient.put(`/bookings/${newBookingId}/replacements`, { replacements });
+        }
       }
       await fetchBookings();
       setShowSaveBookingModal(false);
@@ -290,6 +361,7 @@ export default function WorkAllocation() {
         replacement1WorkerId: slot.r1 || null,
         replacement2WorkerId: slot.r2 || null,
         replacement3WorkerId: slot.r3 || null,
+        replacement4WorkerId: slot.r4 || null,
       }));
       await apiClient.put(`/bookings/${selectedBookingId}/replacements`, { replacements });
       await fetchBookings();
@@ -320,6 +392,7 @@ export default function WorkAllocation() {
     setDeletingId(bookingId);
     if (selectedBookingId === bookingId) setSelectedBookingId(null);
     if (activeBookingId === bookingId) setActiveBookingId(null);
+    if (editingBookingId === bookingId) setEditingBookingId(null);
     try {
       await apiClient.delete(`/bookings/${bookingId}`);
       await fetchBookings();
@@ -333,6 +406,7 @@ export default function WorkAllocation() {
   const handleCancel = () => {
     setLocalZoneMap(null);
     setZoneMapHistory([]);
+    setEditingBookingId(null);
   };
 
   const handleUndo = async () => {
@@ -390,7 +464,7 @@ export default function WorkAllocation() {
       : new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     const replacementEntries = Object.entries(replacementByPostId).filter(
-      ([, slot]) => slot.r1 || slot.r2 || slot.r3
+      ([, slot]) => slot.r1 || slot.r2 || slot.r3 || slot.r4
     );
     const replacementRows = replacementEntries
       .map(([postId, slot]) => {
@@ -398,21 +472,20 @@ export default function WorkAllocation() {
         const w1 = slot.r1 ? workers.find((w) => w.id === slot.r1) : null;
         const w2 = slot.r2 ? workers.find((w) => w.id === slot.r2) : null;
         const w3 = slot.r3 ? workers.find((w) => w.id === slot.r3) : null;
-        return `<tr><td class="print-repl-post">${post?.name ?? postId}</td><td>${w1 ? `(${w1.anciennete}) ${w1.name}` : '—'}</td><td>${w2 ? `(${w2.anciennete}) ${w2.name}` : '—'}</td><td>${w3 ? `(${w3.anciennete}) ${w3.name}` : '—'}</td></tr>`;
+        const w4 = slot.r4 ? workers.find((w) => w.id === slot.r4) : null;
+        const fmt = (w: { anciennete: string; name: string } | null | undefined) => (w ? `(${w.anciennete}) ${w.name}` : '—');
+        return `<tr><td class="print-repl-post">${post?.name ?? postId}</td><td>${fmt(w1)}</td><td>${fmt(w2)}</td><td>${fmt(w3)}</td><td>${fmt(w4)}</td></tr>`;
       })
       .join('');
 
-    const replacementsSection =
-      replacementRows.length > 0
-        ? `
+    const replacementsSection = `
     <div class="print-page-break"></div>
     <div class="print-header">Remplaçants</div>
     <div class="print-effective">Date de début d'exécution : ${effectiveDateStr}</div>
     <table class="print-repl-table">
-      <thead><tr><th>Poste</th><th>Remplaçant 1</th><th>Remplaçant 2</th><th>Remplaçant 3</th></tr></thead>
-      <tbody>${replacementRows}</tbody>
-    </table>`
-        : '';
+      <thead><tr><th>Poste</th><th>Remplaçant du jour 1</th><th>Remplaçant du jour 2</th><th>Remplaçant du soir 1</th><th>Remplaçant du soir 2</th></tr></thead>
+      <tbody>${replacementRows || '<tr><td colspan="5" class="text-center">Aucun remplaçant configuré</td></tr>'}</tbody>
+    </table>`;
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
     <style>
@@ -482,10 +555,23 @@ export default function WorkAllocation() {
             <>
               <button
                 type="button"
-                onClick={() => { setSaveBookingName(''); setSaveBookingEffectiveDate(new Date().toISOString().slice(0, 10)); setBookingError(''); setShowSaveBookingModal(true); }}
+                onClick={() => {
+                  setBookingError('');
+                  if (editingBookingId) {
+                    const b = bookings.find((x) => x.id === editingBookingId);
+                    if (b) {
+                      setSaveBookingName(b.name);
+                      setSaveBookingEffectiveDate(new Date(b.effectiveDate).toISOString().slice(0, 10));
+                    }
+                  } else {
+                    setSaveBookingName('');
+                    setSaveBookingEffectiveDate(new Date().toISOString().slice(0, 10));
+                  }
+                  setShowSaveBookingModal(true);
+                }}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
-                Sauvegarder le booking
+                {editingBookingId ? 'Mettre à jour le booking' : 'Sauvegarder le booking'}
               </button>
               <button
                 type="button"
@@ -550,6 +636,14 @@ export default function WorkAllocation() {
                 </span>
                 <button
                   type="button"
+                  onClick={(e) => { e.stopPropagation(); handleContinueBooking(b); }}
+                  className="px-2 py-1 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700"
+                  title="Continuer / modifier ce booking"
+                >
+                  Modifier
+                </button>
+                <button
+                  type="button"
                   onClick={(e) => { e.stopPropagation(); handleActivateBooking(b.id); }}
                   disabled={activatingId === b.id}
                   className="px-2 py-1 text-xs font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
@@ -600,8 +694,11 @@ export default function WorkAllocation() {
 
           {replacementPostId && (() => {
             const post = posts.find((p) => p.id === replacementPostId);
-            const slot = replacementByPostId[replacementPostId] ?? { r1: null, r2: null, r3: null };
-            const availableWorkers = workers;
+            const defaultSlot: ReplacementSlot = { r1: null, r2: null, r3: null, r4: null };
+            const slot = replacementByPostId[replacementPostId] ?? defaultSlot;
+            const workersSorted = [...workers].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+            const workersJour = workersSorted.filter((w) => WORKER_TYPES_JOUR.includes(w.type));
+            const workersSoir = workersSorted.filter((w) => WORKER_TYPES_SOIR.includes(w.type));
             const canSaveToBooking = !!selectedBookingId;
             return (
               <div className="w-72 shrink-0 flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
@@ -609,20 +706,25 @@ export default function WorkAllocation() {
                   <h3 className="text-sm font-semibold text-gray-800">Remplaçants pour {post?.name ?? '…'}</h3>
                 </div>
                 <div className="p-3 flex-1 min-h-0 overflow-y-auto space-y-3">
-                  {(['r1', 'r2', 'r3'] as const).map((key, idx) => {
+                  {REPLACEMENT_LABELS.map(([key, label]) => {
                     const value = slot[key];
-                    const otherIds = (['r1', 'r2', 'r3'] as const).filter((k) => k !== key).map((k) => slot[k]).filter(Boolean) as string[];
-                    const options = availableWorkers.filter((w) => w.id === value || !otherIds.includes(w.id));
+                    const otherIds = (REPLACEMENT_LABELS.map(([k]) => k) as (keyof ReplacementSlot)[]).filter((k) => k !== key).map((k) => slot[k]).filter(Boolean) as string[];
+                    const pool = key === 'r1' || key === 'r2' ? workersJour : workersSoir;
+                    let options = pool.filter((w) => w.id === value || !otherIds.includes(w.id));
+                    if (value && !options.some((w) => w.id === value)) {
+                      const selected = workers.find((w) => w.id === value);
+                      if (selected) options = [selected, ...options];
+                    }
                     return (
                       <div key={key}>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Remplaçant {idx + 1}</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
                         <select
                           value={value ?? ''}
                           onChange={(e) => {
                             const v = e.target.value || null;
                             setReplacementByPostId((prev) => ({
                               ...prev,
-                              [replacementPostId]: { ...(prev[replacementPostId] ?? { r1: null, r2: null, r3: null }), [key]: v },
+                              [replacementPostId]: { ...(prev[replacementPostId] ?? defaultSlot), [key]: v },
                             }));
                           }}
                           className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5"
@@ -683,7 +785,7 @@ export default function WorkAllocation() {
       {showSaveBookingModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSaveBookingModal(false)}>
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Sauvegarder le booking</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">{editingBookingId ? 'Mettre à jour le booking' : 'Sauvegarder le booking'}</h3>
             <p className="text-sm text-gray-600 mb-3">
               La répartition actuelle sera enregistrée. Les postes des travailleurs ne seront pas modifiés tant que vous n&apos;aurez pas cliqué sur « Appliquer » pour ce booking.
             </p>
@@ -717,7 +819,7 @@ export default function WorkAllocation() {
                 onClick={handleSaveAsBooking}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
-                Sauvegarder
+                {editingBookingId ? 'Mettre à jour' : 'Sauvegarder'}
               </button>
             </div>
           </div>

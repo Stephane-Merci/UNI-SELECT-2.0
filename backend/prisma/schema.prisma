@@ -48,6 +48,7 @@ model Worker {
   bookingReplacements1 BookingReplacement[] @relation("Replacement1")
   bookingReplacements2 BookingReplacement[] @relation("Replacement2")
   bookingReplacements3 BookingReplacement[] @relation("Replacement3")
+  bookingReplacements4 BookingReplacement[] @relation("Replacement4")
 
   @@index([anciennete])
   @@index([type])
@@ -160,7 +161,7 @@ model BookingAssignment {
   @@index([bookingId])
 }
 
-// Per-booking replacement rules: for a post that needs replacement (e.g. assigned workers absent), up to 3 replacement workers.
+// Per-booking replacement rules: 4 slots — 2 "du jour", 2 "du soir".
 model BookingReplacement {
   id                   String   @id @default(cuid())
   bookingId            String
@@ -173,6 +174,8 @@ model BookingReplacement {
   replacement2Worker   Worker?  @relation("Replacement2", fields: [replacement2WorkerId], references: [id], onDelete: SetNull)
   replacement3WorkerId String?
   replacement3Worker   Worker?  @relation("Replacement3", fields: [replacement3WorkerId], references: [id], onDelete: SetNull)
+  replacement4WorkerId String?
+  replacement4Worker   Worker?  @relation("Replacement4", fields: [replacement4WorkerId], references: [id], onDelete: SetNull)
 
   @@unique([bookingId, postId])
   @@index([bookingId])

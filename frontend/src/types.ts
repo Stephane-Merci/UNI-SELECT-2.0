@@ -27,6 +27,22 @@ export const ORIGIN_TYPES: WorkerType[] = [
   WorkerType.MOBILITE_DU_SOIR,
 ];
 
+/** Worker types considered "jour" (day shift) — for filtering replacement du jour dropdowns. */
+export const WORKER_TYPES_JOUR: WorkerType[] = [
+  WorkerType.PERMANENT_JOUR,
+  WorkerType.OCCASIONEL_DU_JOUR,
+  WorkerType.MOBILITE_DU_JOUR,
+  WorkerType.JOUR,
+];
+
+/** Worker types considered "soir" (evening shift) — for filtering replacement du soir dropdowns. */
+export const WORKER_TYPES_SOIR: WorkerType[] = [
+  WorkerType.PERMANENT_SOIR,
+  WorkerType.OCCASIONEL_SOIR,
+  WorkerType.MOBILITE_DU_SOIR,
+  WorkerType.SOIR,
+];
+
 export const WorkerTypeLabels: Record<WorkerType, string> = {
   [WorkerType.PERMANENT_JOUR]: 'Permanent jour',
   [WorkerType.PERMANENT_SOIR]: 'Permanent soir',
@@ -146,4 +162,6 @@ export interface BookingReplacement {
   replacement2Worker?: Worker | null;
   replacement3WorkerId: string | null;
   replacement3Worker?: Worker | null;
+  replacement4WorkerId: string | null;
+  replacement4Worker?: Worker | null;
 }
