@@ -348,7 +348,7 @@ export default function WorkAllocation() {
         setLocalZoneMap((m) => ({ ...m!, [workerId]: post.id }));
       } else {
         if (worker && worker.originalPostId !== post.id) {
-          await updateWorkerOriginalPost(workerId, post.id);
+          void updateWorkerOriginalPost(workerId, post.id);
           setLastMove({ workerId, previousPostId });
         }
       }
@@ -740,10 +740,10 @@ export default function WorkAllocation() {
                 onClick={() => setSelectedBookingId(b.id)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBookingId(b.id); } }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-md border shadow-sm cursor-pointer ${activeBookingId === b.id
-                    ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500'
-                    : selectedBookingId === b.id
-                      ? 'bg-indigo-50 border-indigo-400 ring-1 ring-indigo-400'
-                      : 'bg-white border-gray-200 hover:bg-gray-50'
+                  ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500'
+                  : selectedBookingId === b.id
+                    ? 'bg-indigo-50 border-indigo-400 ring-1 ring-indigo-400'
+                    : 'bg-white border-gray-200 hover:bg-gray-50'
                   }`}
                 title={activeBookingId === b.id ? 'Booking actif (répartition appliquée)' : "Sélectionner pour l'impression"}
               >

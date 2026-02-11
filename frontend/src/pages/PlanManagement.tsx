@@ -73,9 +73,8 @@ function PresenceBox({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-white rounded-lg p-2 border-2 min-h-0 ${
-        isOver ? 'bg-blue-50 border-blue-400' : ''
-      }`}
+      className={`bg-white rounded-lg p-2 border-2 min-h-0 ${isOver ? 'bg-blue-50 border-blue-400' : ''
+        }`}
       style={{
         borderLeftColor: WorkerTypeColors[primaryType],
         borderLeftWidth: '4px',
@@ -121,13 +120,13 @@ function PresenceBox({
 }
 
 // Presence Panel Component (Right Side) - Boxes for each availability type
-function PresencePanel({ 
-  workers, 
+function PresencePanel({
+  workers,
   presences,
   searchFilter,
   onSearchChange,
   onAutoClick,
-}: { 
+}: {
   workers: Worker[];
   presences: Record<string, WorkerType>;
   searchFilter: string;
@@ -233,9 +232,8 @@ function SortablePostColumn({
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative ${wrapperClass} ${isDragging ? 'opacity-50 z-10' : ''} ${
-        isOver ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg bg-blue-50/80' : ''
-      }`}
+      className={`relative ${wrapperClass} ${isDragging ? 'opacity-50 z-10' : ''} ${isOver ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg bg-blue-50/80' : ''
+        }`}
     >
       {isOver && (
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-100/50 z-[1]" aria-hidden>
@@ -343,8 +341,8 @@ export default function PlanManagement() {
   const orderedPosts =
     currentPlan && posts.length > 0
       ? getPlanPostOrder(currentPlan.id, posts.map((p) => p.id))
-          .map((id) => posts.find((p) => p.id === id))
-          .filter((p): p is Post => !!p)
+        .map((id) => posts.find((p) => p.id === id))
+        .filter((p): p is Post => !!p)
       : posts;
   const lockedPostIds = currentPlan ? getPlanLockedPosts(currentPlan.id) : new Set<string>();
   void planLayoutVersion[currentPlan ? 'global' : '']; // subscribe for re-renders (layout is shared across plans)
@@ -513,10 +511,10 @@ export default function PlanManagement() {
         if (currentPresenceType !== droppedType) {
           const isOriginType = ORIGIN_TYPES.includes(droppedType);
           if (isOriginType) {
-            await updateWorkerType(workerId, droppedType);
-            await updateWorkerPresence(currentPlan.id, workerId, droppedType);
+            void updateWorkerType(workerId, droppedType);
+            void updateWorkerPresence(currentPlan.id, workerId, droppedType);
           } else {
-            await updateWorkerPresence(currentPlan.id, workerId, droppedType);
+            void updateWorkerPresence(currentPlan.id, workerId, droppedType);
           }
         }
       }
@@ -593,9 +591,9 @@ export default function PlanManagement() {
       // When assigning from presence/absence (Absent, Vacances, etc.) to a post, set presence
       // back to the worker's origin type (e.g. PERMANENT_JOUR) so they're shown as "back to work"
       if (worker) {
-        await updateWorkerPresence(currentPlan.id, workerId, worker.type);
+        void updateWorkerPresence(currentPlan.id, workerId, worker.type);
       }
-      await assignWorker(currentPlan.id, workerId, post.id);
+      void assignWorker(currentPlan.id, workerId, post.id);
       return;
     }
   };
@@ -630,13 +628,13 @@ export default function PlanManagement() {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-      
+
       const container = document.querySelector('.resizable-container') as HTMLElement;
       if (!container) return;
-      
+
       const containerRect = container.getBoundingClientRect();
       const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-      
+
       // Limit between 20% and 80%
       const clampedWidth = Math.max(20, Math.min(80, newLeftWidth));
       setLeftPanelWidth(clampedWidth);
@@ -789,7 +787,7 @@ export default function PlanManagement() {
         >
           <div className="flex-1 flex p-6 overflow-hidden gap-4 resizable-container">
             {/* Left Panel - Posts */}
-            <div 
+            <div
               className="bg-white rounded-lg shadow p-4 overflow-hidden"
               style={{ width: `${leftPanelWidth}%`, minWidth: '300px' }}
             >
@@ -807,14 +805,13 @@ export default function PlanManagement() {
             {/* Resizer */}
             <div
               onMouseDown={handleMouseDown}
-              className={`w-1 bg-gray-300 hover:bg-blue-500 cursor-col-resize transition-colors ${
-                isResizing ? 'bg-blue-500' : ''
-              }`}
+              className={`w-1 bg-gray-300 hover:bg-blue-500 cursor-col-resize transition-colors ${isResizing ? 'bg-blue-500' : ''
+                }`}
               style={{ minWidth: '4px' }}
             />
 
             {/* Right Panel - Presence */}
-            <div 
+            <div
               className="bg-white rounded-lg shadow p-4 overflow-hidden flex-1"
               style={{ minWidth: '300px' }}
             >

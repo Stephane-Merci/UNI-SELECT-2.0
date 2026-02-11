@@ -338,7 +338,25 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   assignWorker: async (planId, workerId, postId) => {
-    set({ loading: true, error: null });
+    // Optimistic update
+    const previousAssignments = get().assignments;
+    const optimisticAssignment: Assignment = {
+      id: `temp-${Date.now()}`,
+      planId,
+      workerId,
+      postId,
+      assignedAt: new Date().toISOString(),
+      worker: get().workers.find((w) => w.id === workerId)!,
+      post: get().posts.find((p) => p.id === postId)!,
+    };
+
+    set((state) => {
+      const filtered = state.assignments.filter(
+        (a) => !(a.planId === planId && a.workerId === workerId)
+      );
+      return { assignments: [...filtered, optimisticAssignment] };
+    });
+
     try {
       const response = await apiClient.post('/assignments', {
         planId,
@@ -346,58 +364,81 @@ export const useStore = create<AppState>((set, get) => ({
         postId,
       });
       set((state) => {
-        // Remove existing assignment for this worker in this plan if exists
         const filtered = state.assignments.filter(
-          (a) => !(a.planId === planId && a.workerId === workerId)
+          (a) => a.id !== optimisticAssignment.id && !(a.planId === planId && a.workerId === workerId)
         );
-        return {
-          assignments: [...filtered, response.data],
-          loading: false,
-        };
+        return { assignments: [...filtered, response.data] };
       });
     } catch (error: any) {
-      set({ error: error.message, loading: false });
+      set({ assignments: previousAssignments, error: error.message });
       throw error;
     }
   },
 
   updateWorkerPresence: async (planId, workerId, type) => {
-    set({ loading: true, error: null });
+    // Optimistic update
+    const previousPresences = get().workerPresences;
+    const optimisticPresence: WorkerPresence = {
+      id: `temp-pres-${Date.now()}`,
+      planId,
+      workerId,
+      type,
+      updatedAt: new Date().toISOString(),
+      worker: get().workers.find((w) => w.id === workerId)!,
+    };
+
+    set((state) => {
+      const filtered = state.workerPresences.filter(
+        (p) => !(p.planId === planId && p.workerId === workerId)
+      );
+      return { workerPresences: [...filtered, optimisticPresence] };
+    });
+
     try {
       const response = await apiClient.put(`/plans/${planId}/presence/${workerId}`, { type });
       set((state) => {
         const filtered = state.workerPresences.filter(
-          (p) => !(p.planId === planId && p.workerId === workerId)
+          (p) => p.id !== optimisticPresence.id && !(p.planId === planId && p.workerId === workerId)
         );
-        return {
-          workerPresences: [...filtered, response.data],
-          loading: false,
-        };
+        return { workerPresences: [...filtered, response.data] };
       });
     } catch (error: any) {
-      set({ error: error.message, loading: false });
+      set({ workerPresences: previousPresences, error: error.message });
       throw error;
     }
   },
 
   updateWorkerType: async (workerId, type) => {
-    set({ loading: true, error: null });
+    // Optimistic update
+    const previousWorkers = get().workers;
+    set((state) => ({
+      workers: state.workers.map((w) =>
+        w.id === workerId ? { ...w, type } : w
+      ),
+    }));
+
     try {
       const response = await apiClient.patch(`/workers/${workerId}/type`, { type });
       set((state) => ({
         workers: state.workers.map((w) =>
           w.id === workerId ? response.data : w
         ),
-        loading: false,
       }));
     } catch (error: any) {
-      set({ error: error.message, loading: false });
+      set({ workers: previousWorkers, error: error.message });
       throw error;
     }
   },
 
   updateWorkerOriginalPost: async (workerId, originalPostId) => {
-    set({ loading: true, error: null });
+    // Optimistic update
+    const previousWorkers = get().workers;
+    set((state) => ({
+      workers: state.workers.map((w) =>
+        w.id === workerId ? { ...w, originalPostId } : w
+      ),
+    }));
+
     try {
       const response = await apiClient.put(`/workers/${workerId}`, {
         originalPostId,
@@ -406,24 +447,24 @@ export const useStore = create<AppState>((set, get) => ({
         workers: state.workers.map((w) =>
           w.id === workerId ? response.data : w
         ),
-        loading: false,
       }));
     } catch (error: any) {
-      set({ error: error.message, loading: false });
+      set({ workers: previousWorkers, error: error.message });
       throw error;
     }
   },
 
   removeAssignment: async (assignmentId) => {
-    set({ loading: true, error: null });
+    // Optimistic update
+    const previousAssignments = get().assignments;
+    set((state) => ({
+      assignments: state.assignments.filter((a) => a.id !== assignmentId),
+    }));
+
     try {
       await apiClient.delete(`/assignments/${assignmentId}`);
-      set((state) => ({
-        assignments: state.assignments.filter((a) => a.id !== assignmentId),
-        loading: false,
-      }));
     } catch (error: any) {
-      set({ error: error.message, loading: false });
+      set({ assignments: previousAssignments, error: error.message });
       throw error;
     }
   },
