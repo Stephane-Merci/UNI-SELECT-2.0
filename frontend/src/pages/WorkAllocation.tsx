@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
-  closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -15,11 +15,13 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  useSortable,
 } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../store/useStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
-import { Worker, WorkerTypeColors, Booking, BookingReplacement, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR, WorkerType } from '../types';
-import PostColumn from '../components/PostColumn';
+import { Worker, Post, WorkerTypeColors, Booking, BookingReplacement, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR, WorkerType } from '../types';
+import PostColumn, { POST_COLUMN_DRAG_PREFIX } from '../components/PostColumn';
 import WorkerCard, { POST_DRAG_PREFIX, POST_DRAG_SEP } from '../components/WorkerCard';
 import { Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
@@ -92,8 +94,86 @@ function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: stri
   );
 }
 
+// Sortable post column for Booking page: reorder posts, lock, drop indicator
+function SortablePostColumnBooking({
+  post,
+  workers,
+  isLocked,
+  onLockToggle,
+  onReplacementClick,
+}: {
+  post: Post;
+  workers: Worker[];
+  isLocked: boolean;
+  onLockToggle: () => void;
+  onReplacementClick?: () => void;
+}) {
+  const sortableId = `${POST_COLUMN_DRAG_PREFIX}${post.id}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+  } = useSortable({
+    id: sortableId,
+    disabled: isLocked,
+  });
+
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  const wrapperClass = isLocked ? 'w-[130px] flex-shrink-0' : 'min-w-[130px] flex-1 basis-[130px]';
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative ${wrapperClass} ${isDragging ? 'opacity-50 z-10' : ''} ${
+        isOver ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg bg-blue-50/80' : ''
+      }`}
+    >
+      {isOver && (
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-100/50 z-[1]" aria-hidden>
+          <span className="text-xs font-semibold text-blue-700 bg-white/90 px-2 py-1 rounded shadow-sm">Déposer ici</span>
+        </div>
+      )}
+      <PostColumn
+        post={post}
+        workers={workers}
+        onReplacementClick={onReplacementClick}
+        isLocked={isLocked}
+        onLockToggle={onLockToggle}
+        wrapperClassName={wrapperClass}
+        dragHandleProps={isLocked ? undefined : { attributes: attributes as unknown as Record<string, unknown>, listeners: listeners as unknown as Record<string, unknown> }}
+      />
+    </div>
+  );
+}
+
 export default function WorkAllocation() {
-  const { workers, posts, fetchWorkers, fetchPosts, updateWorkerOriginalPost } = useStore();
+  const {
+    workers,
+    posts,
+    fetchWorkers,
+    fetchPosts,
+    updateWorkerOriginalPost,
+    getPlanPostOrder,
+    setPlanPostOrder,
+    getPlanLockedPosts,
+    togglePlanPostLock,
+    planLayoutVersion,
+  } = useStore();
+
+  const BOOKING_LAYOUT_KEY = 'work-allocation';
+  const orderedPosts =
+    posts.length > 0
+      ? getPlanPostOrder(BOOKING_LAYOUT_KEY, posts.map((p) => p.id))
+          .map((id) => posts.find((p) => p.id === id))
+          .filter((p): p is Post => !!p)
+      : posts;
+  const lockedPostIds = getPlanLockedPosts(BOOKING_LAYOUT_KEY);
+  void planLayoutVersion[BOOKING_LAYOUT_KEY];
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);
   // When non-null, we're in "booking meeting" mode: all changes are local until Save.
   const [localZoneMap, setLocalZoneMap] = useState<Record<string, string> | null>(null);
@@ -116,7 +196,7 @@ export default function WorkAllocation() {
   const [replacementSaving, setReplacementSaving] = useState(false);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 2 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const { wrapDragStart, wrapDragEnd } = useAutoScrollDuringDrag();
@@ -217,9 +297,31 @@ export default function WorkAllocation() {
     setActiveWorker(null);
     if (!over) return;
 
-    let workerId = String(active.id);
-    if (workerId.includes(POST_DRAG_SEP)) workerId = workerId.split(POST_DRAG_SEP)[1] ?? workerId;
+    const activeId = String(active.id);
     const overId = String(over.id);
+
+    // Post column reorder (booking layout)
+    if (activeId.startsWith(POST_COLUMN_DRAG_PREFIX)) {
+      if (overId.startsWith(POST_COLUMN_DRAG_PREFIX)) {
+        const fromPostId = activeId.slice(POST_COLUMN_DRAG_PREFIX.length);
+        const toPostId = overId.slice(POST_COLUMN_DRAG_PREFIX.length);
+        if (fromPostId !== toPostId) {
+          const currentOrder = getPlanPostOrder(BOOKING_LAYOUT_KEY, posts.map((p) => p.id));
+          const fromIndex = currentOrder.indexOf(fromPostId);
+          const toIndex = currentOrder.indexOf(toPostId);
+          if (fromIndex !== -1 && toIndex !== -1) {
+            const next = [...currentOrder];
+            next.splice(fromIndex, 1);
+            next.splice(toIndex, 0, fromPostId);
+            setPlanPostOrder(BOOKING_LAYOUT_KEY, next);
+          }
+        }
+      }
+      return;
+    }
+
+    let workerId = activeId;
+    if (workerId.includes(POST_DRAG_SEP)) workerId = workerId.split(POST_DRAG_SEP)[1] ?? workerId;
     const worker = workers.find((x) => x.id === workerId);
     const previousPostId = worker?.originalPostId ?? UNASSIGNED_ZONE;
 
@@ -231,7 +333,9 @@ export default function WorkAllocation() {
       return;
     }
 
-    const post = posts.find((p) => p.id === overId);
+    // Resolve post (overId can be post.id or post-column-{post.id} with pointerWithin)
+    const postIdForDrop = overId.startsWith(POST_COLUMN_DRAG_PREFIX) ? overId.slice(POST_COLUMN_DRAG_PREFIX.length) : overId;
+    const post = posts.find((p) => p.id === postIdForDrop);
     if (post) {
       if (localZoneMap) {
         pushZoneMapToHistory();
@@ -430,8 +534,9 @@ export default function WorkAllocation() {
   const handlePrintBooking = () => {
     const zoneCards: string[] = [];
 
-    // Only post zones (non-assignés excluded from print)
-    for (const post of posts) {
+    // Only post zones (non-assignés excluded from print); use ordered posts to match UI
+    const postsToPrint = orderedPosts.length > 0 ? orderedPosts : posts;
+    for (const post of postsToPrint) {
       const postWorkers = getWorkersForPost(post.id);
       const card = `
       <div class="zone-card">
@@ -670,26 +775,33 @@ export default function WorkAllocation() {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={pointerWithin}
         onDragStart={wrapDragStart(handleDragStart)}
         onDragEnd={wrapDragEnd(handleDragEnd)}
       >
         <div className={`flex gap-4 h-[calc(100vh-220px)] min-h-[400px] ${replacementPostId ? '' : ''}`}>
           <div className="flex-1 min-w-0 overflow-y-auto">
-            <div
-              className="grid gap-2 auto-rows-min p-1"
-              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))' }}
+            <SortableContext
+              items={orderedPosts.filter((p) => !lockedPostIds.has(p.id)).map((p) => `${POST_COLUMN_DRAG_PREFIX}${p.id}`)}
+              strategy={verticalListSortingStrategy}
             >
-              <UnassignedColumn workers={getUnassignedWorkers()} postId={UNASSIGNED_ZONE} />
-              {posts.map((post) => (
-                <PostColumn
-                  key={post.id}
-                  post={post}
-                  workers={getWorkersForPost(post.id)}
-                  onReplacementClick={localZoneMap != null || selectedBookingId != null ? () => setReplacementPostId(post.id) : undefined}
-                />
-              ))}
-            </div>
+              <div
+                className="grid gap-2 auto-rows-min p-1"
+                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))' }}
+              >
+                <UnassignedColumn workers={getUnassignedWorkers()} postId={UNASSIGNED_ZONE} />
+                {orderedPosts.map((post) => (
+                  <SortablePostColumnBooking
+                    key={post.id}
+                    post={post}
+                    workers={getWorkersForPost(post.id)}
+                    isLocked={lockedPostIds.has(post.id)}
+                    onLockToggle={() => togglePlanPostLock(BOOKING_LAYOUT_KEY, post.id)}
+                    onReplacementClick={localZoneMap != null || selectedBookingId != null ? () => setReplacementPostId(post.id) : undefined}
+                  />
+                ))}
+              </div>
+            </SortableContext>
           </div>
 
           {replacementPostId && (() => {

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   DndContext,
   DragOverlay,
-  closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -16,11 +16,13 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  useSortable,
 } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../store/useStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
 import { Worker, Post, WorkerType, WorkerTypeColors, ORIGIN_TYPES, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR } from '../types';
-import PostColumn from '../components/PostColumn';
+import PostColumn, { POST_COLUMN_DRAG_PREFIX } from '../components/PostColumn';
 import WorkerCard, { getWorkerIdFromDragId, PRESENCE_DRAG_PREFIX } from '../components/WorkerCard';
 import PlanManagementModal from '../components/PlanManagementModal';
 import { io } from 'socket.io-client';
@@ -191,20 +193,88 @@ function PresencePanel({
   );
 }
 
+// Sortable wrapper for a post column. Locked posts are not draggable.
+function SortablePostColumn({
+  post,
+  workers,
+  isLocked,
+  onLockToggle,
+  getWorkersForPost,
+}: {
+  post: Post;
+  workers: Worker[];
+  isLocked: boolean;
+  onLockToggle: () => void;
+  getWorkersForPost: (postId: string) => Worker[];
+}) {
+  const sortableId = `${POST_COLUMN_DRAG_PREFIX}${post.id}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+  } = useSortable({
+    id: sortableId,
+    disabled: isLocked,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  // Locked: fixed width, only wraps when no space. Unlocked: can grow and unwrap when zone increases.
+  const wrapperClass = isLocked
+    ? 'w-[130px] flex-shrink-0'
+    : 'min-w-[130px] flex-1 basis-[130px]';
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative ${wrapperClass} ${isDragging ? 'opacity-50 z-10' : ''} ${
+        isOver ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg bg-blue-50/80' : ''
+      }`}
+    >
+      {isOver && (
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-100/50 z-[1]" aria-hidden>
+          <span className="text-xs font-semibold text-blue-700 bg-white/90 px-2 py-1 rounded shadow-sm">Déposer ici</span>
+        </div>
+      )}
+      <PostColumn
+        post={post}
+        workers={workers}
+        isLocked={isLocked}
+        onLockToggle={onLockToggle}
+        wrapperClassName={wrapperClass}
+        dragHandleProps={isLocked ? undefined : { attributes, listeners }}
+      />
+    </div>
+  );
+}
+
 // Posts Panel Component (Left Side) - Only posts, no unassigned.
 // Workers in attendance/absence (Absent, Vacances, etc.) are not shown on posts.
-function PostsPanel({ 
-  posts, 
+// Supports reordering (drag) and lock; locked posts have fixed width and only wrap when no space.
+function PostsPanel({
+  posts,
   workers,
-  assignments, 
+  assignments,
   presences,
   attendancePresenceTypes,
-}: { 
+  lockedPostIds,
+  onPostLockToggle,
+}: {
   posts: Post[];
   workers: Worker[];
-  assignments: Record<string, string>; // workerId -> postId
+  assignments: Record<string, string>;
   presences: Record<string, WorkerType>;
   attendancePresenceTypes: Set<WorkerType>;
+  lockedPostIds: Set<string>;
+  onPostLockToggle: (postId: string) => void;
 }) {
   const getWorkersForPost = (postId: string) => {
     return workers.filter((worker) => {
@@ -214,21 +284,31 @@ function PostsPanel({
     });
   };
 
+  const sortablePostIds = posts
+    .filter((p) => !lockedPostIds.has(p.id))
+    .map((p) => `${POST_COLUMN_DRAG_PREFIX}${p.id}`);
+
   return (
     <div className="h-full flex flex-col">
       <h2 className="text-xl font-bold mb-4 text-gray-800">Postes</h2>
       <div className="flex-1 overflow-y-auto">
-        <div className="flex flex-wrap gap-2">
-          {/* Post Columns — fixed width so they pack first row, then wrap */}
-          {posts.map((post) => (
-            <div key={post.id} className="w-[130px] flex-shrink-0">
-              <PostColumn
+        <SortableContext
+          items={sortablePostIds}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="flex flex-wrap gap-2">
+            {posts.map((post) => (
+              <SortablePostColumn
+                key={post.id}
                 post={post}
                 workers={getWorkersForPost(post.id)}
+                isLocked={lockedPostIds.has(post.id)}
+                onLockToggle={() => onPostLockToggle(post.id)}
+                getWorkersForPost={getWorkersForPost}
               />
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </SortableContext>
       </div>
     </div>
   );
@@ -253,7 +333,22 @@ export default function PlanManagement() {
     removeAssignment,
     updateWorkerPresence,
     updateWorkerType,
+    getPlanPostOrder,
+    setPlanPostOrder,
+    getPlanLockedPosts,
+    togglePlanPostLock,
+    planLayoutVersion,
   } = useStore();
+
+  // Ordered posts for current plan (persisted in localStorage); re-render when layout changes
+  const orderedPosts =
+    currentPlan && posts.length > 0
+      ? getPlanPostOrder(currentPlan.id, posts.map((p) => p.id))
+          .map((id) => posts.find((p) => p.id === id))
+          .filter((p): p is Post => !!p)
+      : posts;
+  const lockedPostIds = currentPlan ? getPlanLockedPosts(currentPlan.id) : new Set<string>();
+  void planLayoutVersion[currentPlan?.id ?? '']; // subscribe for re-renders
 
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -279,7 +374,9 @@ export default function PlanManagement() {
   } | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 2 },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -370,9 +467,31 @@ export default function PlanManagement() {
 
     if (!over || !currentPlan) return;
 
-    const workerId = getWorkerIdFromDragId(String(active.id));
-    if (!workerId) return;
+    const activeId = String(active.id);
     const overId = String(over.id);
+
+    // Post column reorder (plan zone)
+    if (activeId.startsWith(POST_COLUMN_DRAG_PREFIX)) {
+      if (overId.startsWith(POST_COLUMN_DRAG_PREFIX)) {
+        const fromPostId = activeId.slice(POST_COLUMN_DRAG_PREFIX.length);
+        const toPostId = overId.slice(POST_COLUMN_DRAG_PREFIX.length);
+        if (fromPostId !== toPostId) {
+          const currentOrder = getPlanPostOrder(currentPlan.id, posts.map((p) => p.id));
+          const fromIndex = currentOrder.indexOf(fromPostId);
+          const toIndex = currentOrder.indexOf(toPostId);
+          if (fromIndex !== -1 && toIndex !== -1) {
+            const next = [...currentOrder];
+            next.splice(fromIndex, 1);
+            next.splice(toIndex, 0, fromPostId);
+            setPlanPostOrder(currentPlan.id, next);
+          }
+        }
+      }
+      return;
+    }
+
+    const workerId = getWorkerIdFromDragId(activeId);
+    if (!workerId) return;
 
     const worker = workers.find((w) => w.id === workerId);
     const previousPresenceType = presenceMap[workerId] ?? worker?.type ?? ('' as WorkerType);
@@ -466,8 +585,9 @@ export default function PlanManagement() {
       return;
     }
 
-    // Check if dropping on a post
-    const post = posts.find((p) => p.id === overId);
+    // Check if dropping on a post (overId can be post.id or post-column-{post.id} with pointerWithin)
+    const postIdForDrop = overId.startsWith(POST_COLUMN_DRAG_PREFIX) ? overId.slice(POST_COLUMN_DRAG_PREFIX.length) : overId;
+    const post = posts.find((p) => p.id === postIdForDrop);
     if (post) {
       // Keep previousPostId so Undo can restore: if worker was on another post, put them back there; if from fiche de présence, previousPostId is null and Undo will remove assignment
       setLastPlanAction({ workerId, previousPostId, previousPresenceType });
@@ -664,7 +784,7 @@ export default function PlanManagement() {
       {currentPlan ? (
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={pointerWithin}
           onDragStart={wrapDragStart(handleDragStart)}
           onDragEnd={wrapDragEnd(handleDragEnd)}
         >
@@ -675,11 +795,13 @@ export default function PlanManagement() {
               style={{ width: `${leftPanelWidth}%`, minWidth: '300px' }}
             >
               <PostsPanel
-                posts={posts}
+                posts={orderedPosts}
                 workers={allWorkersForDisplay}
                 assignments={assignmentMap}
                 presences={presenceMap}
                 attendancePresenceTypes={ATTENDANCE_PRESENCE_TYPES}
+                lockedPostIds={lockedPostIds}
+                onPostLockToggle={(postId) => currentPlan && togglePlanPostLock(currentPlan.id, postId)}
               />
             </div>
 

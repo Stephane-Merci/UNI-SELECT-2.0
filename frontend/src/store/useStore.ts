@@ -2,6 +2,47 @@ import { create } from 'zustand';
 import { Worker, Post, Assignment, WorkerType, Plan, WorkerPresence } from '../types';
 import apiClient from '../api/client';
 
+const PLAN_POST_ORDER_KEY = 'plan-post-order';
+const PLAN_LOCKED_POSTS_KEY = 'plan-locked-posts';
+
+function loadPlanPostOrder(planId: string): string[] | null {
+  try {
+    const raw = localStorage.getItem(`${PLAN_POST_ORDER_KEY}-${planId}`);
+    if (!raw) return null;
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePlanPostOrder(planId: string, order: string[]) {
+  try {
+    localStorage.setItem(`${PLAN_POST_ORDER_KEY}-${planId}`, JSON.stringify(order));
+  } catch {
+    // ignore
+  }
+}
+
+function loadPlanLockedPosts(planId: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(`${PLAN_LOCKED_POSTS_KEY}-${planId}`);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function savePlanLockedPosts(planId: string, locked: Set<string>) {
+  try {
+    localStorage.setItem(`${PLAN_LOCKED_POSTS_KEY}-${planId}`, JSON.stringify([...locked]));
+  } catch {
+    // ignore
+  }
+}
+
 interface AppState {
   workers: Worker[];
   posts: Post[];
@@ -9,9 +50,16 @@ interface AppState {
   currentPlan: Plan | null;
   assignments: Assignment[];
   workerPresences: WorkerPresence[];
+  /** Bump to force re-render when plan layout (order/lock) changes. */
+  planLayoutVersion: Record<string, number>;
   loading: boolean;
   error: string | null;
-  
+
+  getPlanPostOrder: (planId: string, postIds: string[]) => string[];
+  setPlanPostOrder: (planId: string, order: string[]) => void;
+  getPlanLockedPosts: (planId: string) => Set<string>;
+  togglePlanPostLock: (planId: string, postId: string) => void;
+
   // Actions
   fetchWorkers: () => Promise<void>;
   fetchPosts: () => Promise<void>;
@@ -41,8 +89,36 @@ export const useStore = create<AppState>((set, get) => ({
   currentPlan: null,
   assignments: [],
   workerPresences: [],
+  planLayoutVersion: {},
   loading: false,
   error: null,
+
+  getPlanPostOrder: (planId, postIds) => {
+    const saved = loadPlanPostOrder(planId);
+    if (!saved?.length) return postIds;
+    const order = saved.filter((id) => postIds.includes(id));
+    const appended = postIds.filter((id) => !saved.includes(id));
+    return [...order, ...appended];
+  },
+
+  setPlanPostOrder: (planId, order) => {
+    savePlanPostOrder(planId, order);
+    set((state) => ({
+      planLayoutVersion: { ...state.planLayoutVersion, [planId]: Date.now() },
+    }));
+  },
+
+  getPlanLockedPosts: (planId) => loadPlanLockedPosts(planId),
+
+  togglePlanPostLock: (planId, postId) => {
+    const locked = loadPlanLockedPosts(planId);
+    if (locked.has(postId)) locked.delete(postId);
+    else locked.add(postId);
+    savePlanLockedPosts(planId, locked);
+    set((state) => ({
+      planLayoutVersion: { ...state.planLayoutVersion, [planId]: Date.now() },
+    }));
+  },
 
   fetchWorkers: async () => {
     set({ loading: true, error: null });
