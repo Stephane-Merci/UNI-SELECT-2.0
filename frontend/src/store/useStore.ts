@@ -4,10 +4,13 @@ import apiClient from '../api/client';
 
 const PLAN_POST_ORDER_KEY = 'plan-post-order';
 const PLAN_LOCKED_POSTS_KEY = 'plan-locked-posts';
+// Single layout key for all plans so post order and lock state are consistent across plans
+const PLAN_LAYOUT_GLOBAL_KEY = 'global';
 
 function loadPlanPostOrder(planId: string): string[] | null {
   try {
-    const raw = localStorage.getItem(`${PLAN_POST_ORDER_KEY}-${planId}`);
+    const key = planId === 'work-allocation' ? planId : PLAN_LAYOUT_GLOBAL_KEY;
+    const raw = localStorage.getItem(`${PLAN_POST_ORDER_KEY}-${key}`);
     if (!raw) return null;
     const arr = JSON.parse(raw);
     return Array.isArray(arr) ? arr : null;
@@ -18,7 +21,8 @@ function loadPlanPostOrder(planId: string): string[] | null {
 
 function savePlanPostOrder(planId: string, order: string[]) {
   try {
-    localStorage.setItem(`${PLAN_POST_ORDER_KEY}-${planId}`, JSON.stringify(order));
+    const key = planId === 'work-allocation' ? planId : PLAN_LAYOUT_GLOBAL_KEY;
+    localStorage.setItem(`${PLAN_POST_ORDER_KEY}-${key}`, JSON.stringify(order));
   } catch {
     // ignore
   }
@@ -26,7 +30,8 @@ function savePlanPostOrder(planId: string, order: string[]) {
 
 function loadPlanLockedPosts(planId: string): Set<string> {
   try {
-    const raw = localStorage.getItem(`${PLAN_LOCKED_POSTS_KEY}-${planId}`);
+    const key = planId === 'work-allocation' ? planId : PLAN_LAYOUT_GLOBAL_KEY;
+    const raw = localStorage.getItem(`${PLAN_LOCKED_POSTS_KEY}-${key}`);
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
     return new Set(Array.isArray(arr) ? arr : []);
@@ -37,7 +42,8 @@ function loadPlanLockedPosts(planId: string): Set<string> {
 
 function savePlanLockedPosts(planId: string, locked: Set<string>) {
   try {
-    localStorage.setItem(`${PLAN_LOCKED_POSTS_KEY}-${planId}`, JSON.stringify([...locked]));
+    const key = planId === 'work-allocation' ? planId : PLAN_LAYOUT_GLOBAL_KEY;
+    localStorage.setItem(`${PLAN_LOCKED_POSTS_KEY}-${key}`, JSON.stringify([...locked]));
   } catch {
     // ignore
   }
@@ -103,8 +109,9 @@ export const useStore = create<AppState>((set, get) => ({
 
   setPlanPostOrder: (planId, order) => {
     savePlanPostOrder(planId, order);
+    const versionKey = planId === 'work-allocation' ? planId : PLAN_LAYOUT_GLOBAL_KEY;
     set((state) => ({
-      planLayoutVersion: { ...state.planLayoutVersion, [planId]: Date.now() },
+      planLayoutVersion: { ...state.planLayoutVersion, [versionKey]: Date.now() },
     }));
   },
 
@@ -115,8 +122,9 @@ export const useStore = create<AppState>((set, get) => ({
     if (locked.has(postId)) locked.delete(postId);
     else locked.add(postId);
     savePlanLockedPosts(planId, locked);
+    const versionKey = planId === 'work-allocation' ? planId : PLAN_LAYOUT_GLOBAL_KEY;
     set((state) => ({
-      planLayoutVersion: { ...state.planLayoutVersion, [planId]: Date.now() },
+      planLayoutVersion: { ...state.planLayoutVersion, [versionKey]: Date.now() },
     }));
   },
 

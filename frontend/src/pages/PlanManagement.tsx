@@ -348,7 +348,7 @@ export default function PlanManagement() {
           .filter((p): p is Post => !!p)
       : posts;
   const lockedPostIds = currentPlan ? getPlanLockedPosts(currentPlan.id) : new Set<string>();
-  void planLayoutVersion[currentPlan?.id ?? '']; // subscribe for re-renders
+  void planLayoutVersion[currentPlan ? 'global' : '']; // subscribe for re-renders (layout is shared across plans)
 
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
