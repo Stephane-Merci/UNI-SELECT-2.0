@@ -41,15 +41,15 @@ export default function PostColumn({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-0.5">
-{onLockToggle != null && (
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); onLockToggle(); }}
-              className={`p-0.5 rounded ${isLocked ? 'text-amber-600 hover:bg-amber-100' : 'text-gray-400 hover:bg-gray-200'}`}
-              title={isLocked ? 'Poste verrouillé (cliquer pour déverrouiller)' : 'Poste déverrouillé (cliquer pour verrouiller)'}
-              aria-label={isLocked ? 'Déverrouiller le poste' : 'Verrouiller le poste'}
-            >
+        {onLockToggle != null && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onLockToggle(); }}
+            className={`p-0.5 rounded ${isLocked ? 'text-amber-600 hover:bg-amber-100' : 'text-gray-400 hover:bg-gray-200'}`}
+            title={isLocked ? 'Poste verrouillé (cliquer pour déverrouiller)' : 'Poste déverrouillé (cliquer pour verrouiller)'}
+            aria-label={isLocked ? 'Déverrouiller le poste' : 'Verrouiller le poste'}
+          >
             {isLocked ? (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm2-2v2h6V7a3 3 0 00-6 0v2h2z" clipRule="evenodd" />
@@ -80,12 +80,11 @@ export default function PostColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col h-full min-h-0 bg-white rounded-lg border-2 max-w-[130px] w-full overflow-hidden ${wrapperClassName ?? ''} ${
-        isOver ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-      }`}
+      className={`flex flex-col h-full min-h-0 bg-white rounded-lg border-2 max-w-[130px] w-full overflow-hidden ${wrapperClassName ?? ''} ${isOver ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+        }`}
     >
       <div
-        className={`flex justify-between items-start shrink-0 px-2 py-1.5 bg-gray-100 rounded-t-md ${dragHandleProps && !isLocked ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        className={`flex justify-between items-start shrink-0 px-2 py-1.5 bg-gray-200 rounded-t-md ${dragHandleProps && !isLocked ? 'cursor-grab active:cursor-grabbing' : ''}`}
         {...(dragHandleProps && !isLocked ? dragHandleProps.attributes : {})}
         {...(dragHandleProps && !isLocked ? dragHandleProps.listeners : {})}
       >
@@ -106,9 +105,9 @@ export default function PostColumn({
                 />
               ))
             ) : (
-            <p className="text-[10px] text-gray-400 italic text-center py-2">
-              Aucun travailleur assigné
-            </p>
+              <p className="text-[10px] text-gray-400 italic text-center py-2">
+                Aucun travailleur assigné
+              </p>
             )}
           </div>
         </SortableContext>

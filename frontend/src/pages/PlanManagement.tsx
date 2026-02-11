@@ -275,11 +275,13 @@ function PostsPanel({
   onPostLockToggle: (postId: string) => void;
 }) {
   const getWorkersForPost = (postId: string) => {
-    return workers.filter((worker) => {
-      if (assignments[worker.id] !== postId) return false;
-      const pt = presences[worker.id] ?? worker.type;
-      return !attendancePresenceTypes.has(pt);
-    });
+    return workers
+      .filter((worker) => {
+        if (assignments[worker.id] !== postId) return false;
+        const pt = presences[worker.id] ?? worker.type;
+        return !attendancePresenceTypes.has(pt);
+      })
+      .sort((a, b) => a.anciennete.localeCompare(b.anciennete, 'fr', { numeric: true }));
   };
 
   const sortablePostIds = posts
@@ -874,7 +876,7 @@ export default function PlanManagement() {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Remplaçant requis</h3>
             <p className="text-sm text-gray-700 mb-3">
               <span className="font-medium">({replacementPrompt.workerAnciennete}) {replacementPrompt.workerName}</span>
-              {' '}était le seul travailleur {replacementPrompt.shift === 'jour' ? 'du jour' : 'du soir'} sur le poste{' '}
+              {' '}étant absent, choisissez qui va le/la remplacer sur le poste{' '}
               <span className="font-medium">{replacementPrompt.postName}</span>.
               <br />
               Choisissez qui le remplace :

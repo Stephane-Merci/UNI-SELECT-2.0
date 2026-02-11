@@ -65,9 +65,8 @@ function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: stri
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-h-[140px] max-h-[250px] bg-gray-100 rounded-lg p-2 border-2 ${
-        isOver ? 'border-blue-500 bg-blue-100' : 'border-gray-200'
-      }`}
+      className={`flex flex-col min-h-[140px] max-h-[250px] bg-gray-100 rounded-lg p-2 border-2 ${isOver ? 'border-blue-500 bg-blue-100' : 'border-gray-200'
+        }`}
     >
       <h2 className="font-semibold text-sm mb-2 text-gray-700 shrink-0">Non assignés</h2>
       <SortableContext
@@ -129,9 +128,8 @@ function SortablePostColumnBooking({
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative ${wrapperClass} ${isDragging ? 'opacity-50 z-10' : ''} ${
-        isOver ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg bg-blue-50/80' : ''
-      }`}
+      className={`relative ${wrapperClass} ${isDragging ? 'opacity-50 z-10' : ''} ${isOver ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg bg-blue-50/80' : ''
+        }`}
     >
       {isOver && (
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-100/50 z-[1]" aria-hidden>
@@ -169,8 +167,8 @@ export default function WorkAllocation() {
   const orderedPosts =
     posts.length > 0
       ? getPlanPostOrder(BOOKING_LAYOUT_KEY, posts.map((p) => p.id))
-          .map((id) => posts.find((p) => p.id === id))
-          .filter((p): p is Post => !!p)
+        .map((id) => posts.find((p) => p.id === id))
+        .filter((p): p is Post => !!p)
       : posts;
   const lockedPostIds = getPlanLockedPosts(BOOKING_LAYOUT_KEY);
   void planLayoutVersion[BOOKING_LAYOUT_KEY];
@@ -194,6 +192,11 @@ export default function WorkAllocation() {
   const [replacementByPostId, setReplacementByPostId] = useState<Record<string, ReplacementSlot>>({});
   const [replacementSaveError, setReplacementSaveError] = useState('');
   const [replacementSaving, setReplacementSaving] = useState(false);
+  const [applyBookingConfirm, setApplyBookingConfirm] = useState<{
+    bookingId: string;
+    newName: string;
+    currentActiveName: string | null;
+  } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 2 } }),
@@ -265,7 +268,10 @@ export default function WorkAllocation() {
   );
 
   const getWorkersForPost = useCallback(
-    (postId: string) => workers.filter((w) => currentZone(w) === postId),
+    (postId: string) =>
+      workers
+        .filter((w) => currentZone(w) === postId)
+        .sort((a, b) => a.anciennete.localeCompare(b.anciennete, 'fr', { numeric: true })),
     [workers, currentZone]
   );
 
@@ -478,6 +484,7 @@ export default function WorkAllocation() {
   }, [selectedBookingId, replacementByPostId]);
 
   const handleActivateBooking = async (bookingId: string) => {
+    setApplyBookingConfirm(null);
     setActivatingId(bookingId);
     setSelectedBookingId(bookingId);
     try {
@@ -489,6 +496,15 @@ export default function WorkAllocation() {
     } finally {
       setActivatingId(null);
     }
+  };
+
+  const openApplyBookingConfirm = (b: Booking) => {
+    const currentActive = activeBookingId ? bookings.find((x) => x.id === activeBookingId) : null;
+    setApplyBookingConfirm({
+      bookingId: b.id,
+      newName: b.name,
+      currentActiveName: currentActive?.name ?? null,
+    });
   };
 
   const handleDeleteBooking = async (bookingId: string, bookingName: string) => {
@@ -544,19 +560,19 @@ export default function WorkAllocation() {
         ${post.description ? `<div class="zone-desc">${post.description}</div>` : ''}
         <div class="zone-workers">
           ${postWorkers.length > 0
-            ? postWorkers
-                .map(
-                  (w) => {
-                    const color = (WorkerTypeColors as Record<string, string>)[w.type] || '#e5e7eb';
-                    const originalName = w.originalPost?.name ?? '-';
-                    return `<div class="worker-card" style="background-color:${color}20;border-left:3px solid ${color};">
+          ? postWorkers
+            .map(
+              (w) => {
+                const color = (WorkerTypeColors as Record<string, string>)[w.type] || '#e5e7eb';
+                const originalName = w.originalPost?.name ?? '-';
+                return `<div class="worker-card" style="background-color:${color}20;border-left:3px solid ${color};">
                       <div class="worker-name">(${w.anciennete}) ${w.name}</div>
                       <div class="worker-meta">${originalName}</div>
                     </div>`;
-                  }
-                )
-                .join('')
-            : '<span class="text-gray-400 italic">Vide</span>'}
+              }
+            )
+            .join('')
+          : '<span class="text-gray-400 italic">Vide</span>'}
         </div>
       </div>`;
       zoneCards.push(card);
@@ -723,13 +739,12 @@ export default function WorkAllocation() {
                 tabIndex={0}
                 onClick={() => setSelectedBookingId(b.id)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBookingId(b.id); } }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md border shadow-sm cursor-pointer ${
-                  activeBookingId === b.id
+                className={`flex items-center gap-2 px-3 py-2 rounded-md border shadow-sm cursor-pointer ${activeBookingId === b.id
                     ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500'
                     : selectedBookingId === b.id
                       ? 'bg-indigo-50 border-indigo-400 ring-1 ring-indigo-400'
                       : 'bg-white border-gray-200 hover:bg-gray-50'
-                }`}
+                  }`}
                 title={activeBookingId === b.id ? 'Booking actif (répartition appliquée)' : "Sélectionner pour l'impression"}
               >
                 {activeBookingId === b.id && (
@@ -749,7 +764,7 @@ export default function WorkAllocation() {
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); handleActivateBooking(b.id); }}
+                  onClick={(e) => { e.stopPropagation(); openApplyBookingConfirm(b); }}
                   disabled={activatingId === b.id}
                   className="px-2 py-1 text-xs font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
                 >
@@ -932,6 +947,42 @@ export default function WorkAllocation() {
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
                 {editingBookingId ? 'Mettre à jour' : 'Sauvegarder'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {applyBookingConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setApplyBookingConfirm(null)}>
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Appliquer le booking</h3>
+            <p className="text-sm text-gray-700 mb-4">
+              {applyBookingConfirm.currentActiveName ? (
+                <>
+                  Le booking <strong>« {applyBookingConfirm.newName} »</strong> va remplacer le booking actuellement actif <strong>« {applyBookingConfirm.currentActiveName} »</strong>.
+                  Les postes d&apos;origine des travailleurs seront mis à jour selon le nouveau booking.
+                </>
+              ) : (
+                <>
+                  Appliquer le booking <strong>« {applyBookingConfirm.newName} »</strong> ? Les postes d&apos;origine des travailleurs seront mis à jour.
+                </>
+              )}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setApplyBookingConfirm(null)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => handleActivateBooking(applyBookingConfirm.bookingId)}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700"
+              >
+                Confirmer
               </button>
             </div>
           </div>
