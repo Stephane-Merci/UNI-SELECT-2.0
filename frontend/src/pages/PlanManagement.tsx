@@ -199,13 +199,11 @@ function SortablePostColumn({
   workers,
   isLocked,
   onLockToggle,
-  getWorkersForPost,
 }: {
   post: Post;
   workers: Worker[];
   isLocked: boolean;
   onLockToggle: () => void;
-  getWorkersForPost: (postId: string) => Worker[];
 }) {
   const sortableId = `${POST_COLUMN_DRAG_PREFIX}${post.id}`;
   const {
@@ -250,7 +248,7 @@ function SortablePostColumn({
         isLocked={isLocked}
         onLockToggle={onLockToggle}
         wrapperClassName={wrapperClass}
-        dragHandleProps={isLocked ? undefined : { attributes, listeners }}
+        dragHandleProps={isLocked ? undefined : { attributes: attributes as unknown as Record<string, unknown>, listeners: (listeners ?? {}) as unknown as Record<string, unknown> }}
       />
     </div>
   );
@@ -304,7 +302,6 @@ function PostsPanel({
                 workers={getWorkersForPost(post.id)}
                 isLocked={lockedPostIds.has(post.id)}
                 onLockToggle={() => onPostLockToggle(post.id)}
-                getWorkersForPost={getWorkersForPost}
               />
             ))}
           </div>
