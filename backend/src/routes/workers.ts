@@ -5,6 +5,8 @@ import { z } from 'zod';
 
 const router = express.Router();
 
+const PRE_RETRAITE_DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'] as const;
+
 // Only these 6 types can be used for Worker.type (origin type) and in create-worker dropdown
 const ORIGIN_TYPES: WorkerType[] = [
   WorkerType.PERMANENT_JOUR,
@@ -20,6 +22,7 @@ const workerSchema = z.object({
   name: z.string().min(1),
   type: z.enum(ORIGIN_TYPES as unknown as [string, ...string[]]),
   originalPostId: z.string().min(1),
+  preRetraiteDay: z.enum(PRE_RETRAITE_DAYS).nullable().optional(),
 });
 
 // Get all workers
@@ -71,7 +74,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const data = workerSchema.parse(req.body);
-    
+
     // Verify post exists
     const post = await prisma.post.findUnique({
       where: { id: data.originalPostId },
@@ -81,12 +84,13 @@ router.post('/', async (req, res) => {
     }
 
     // Map validated payload to Prisma shape: connect originalPost, cast type to WorkerType
-    const { originalPostId, type, ...rest } = data;
+    const { originalPostId, type, preRetraiteDay, ...rest } = data;
 
     const worker = await prisma.worker.create({
       data: {
         ...rest,
         type: type as WorkerType,
+        preRetraiteDay: preRetraiteDay ?? null,
         originalPost: {
           connect: { id: originalPostId },
         },
@@ -109,8 +113,8 @@ router.put('/:id', async (req, res) => {
   try {
     const updateSchema = workerSchema.partial();
     const data = updateSchema.parse(req.body);
-    
-    const { originalPostId, type, ...rest } = data;
+
+    const { originalPostId, type, preRetraiteDay, ...rest } = data;
 
     const updateData: any = { ...rest };
 
@@ -119,6 +123,17 @@ router.put('/:id', async (req, res) => {
         return res.status(400).json({ error: 'Invalid worker type' });
       }
       updateData.type = type as WorkerType;
+    }
+
+    if (preRetraiteDay !== undefined) {
+      // Allow clearing pre-retirement by sending null
+      if (preRetraiteDay === null) {
+        updateData.preRetraiteDay = null;
+      } else if ((PRE_RETRAITE_DAYS as readonly string[]).includes(preRetraiteDay)) {
+        updateData.preRetraiteDay = preRetraiteDay;
+      } else {
+        return res.status(400).json({ error: 'Invalid preRetraiteDay' });
+      }
     }
 
     if (originalPostId) {
@@ -141,7 +156,7 @@ router.put('/:id', async (req, res) => {
         originalPost: true,
       },
     });
-    
+
     // Emit real-time update if originalPost was changed
     if (data.originalPostId) {
       io.emit('worker-original-post-updated', {
@@ -149,9 +164,10 @@ router.put('/:id', async (req, res) => {
         room: 'main',
       });
     }
-    
+
     res.json(worker);
   } catch (error) {
+    console.error('Error updating worker:', error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
     }

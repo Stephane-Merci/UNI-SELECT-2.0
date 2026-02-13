@@ -86,6 +86,8 @@ export interface Worker {
   type: WorkerType;
   originalPostId: string;
   originalPost: Post;
+  /** Weekly pre-retirement day (e.g. 'MONDAY'–'FRIDAY'), or null when not in pré-retraite. */
+  preRetraiteDay?: string | null;
   assignments?: Assignment[];
   createdAt: string;
   updatedAt: string;

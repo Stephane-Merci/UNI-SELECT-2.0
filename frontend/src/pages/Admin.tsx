@@ -27,10 +27,11 @@ export default function Admin() {
   });
 
   const [editingWorkerId, setEditingWorkerId] = useState<string | null>(null);
-  const [workerForm, setWorkerForm] = useState<{ name: string; anciennete: string; originalPostId: string }>({
+  const [workerForm, setWorkerForm] = useState<{ name: string; anciennete: string; originalPostId: string; preRetraiteDay: string }>({
     name: '',
     anciennete: '',
     originalPostId: '',
+    preRetraiteDay: '',
   });
 
   const [accountForm, setAccountForm] = useState<{ username: string; email: string; password: string }>({
@@ -106,6 +107,7 @@ export default function Admin() {
       name: worker.name,
       anciennete: worker.anciennete,
       originalPostId: worker.originalPostId,
+      preRetraiteDay: worker.preRetraiteDay ?? '',
     });
   };
 
@@ -118,6 +120,7 @@ export default function Admin() {
         name: workerForm.name,
         anciennete: workerForm.anciennete,
         originalPostId: workerForm.originalPostId,
+        preRetraiteDay: workerForm.preRetraiteDay || null,
       });
       await fetchWorkers();
       setEditingWorkerId(null);
@@ -198,6 +201,7 @@ export default function Admin() {
                 <th className="px-3 py-2 text-left font-medium text-gray-700">Nom</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-700">Ancienneté</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-700">Poste original</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700">Pré-retraite</th>
                 <th className="px-3 py-2 text-right font-medium text-gray-700">Actions</th>
               </tr>
             </thead>
@@ -242,6 +246,55 @@ export default function Admin() {
                       </select>
                     ) : (
                       w.originalPost?.name ?? '-'
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {editingWorkerId === w.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={!!workerForm.preRetraiteDay}
+                          onChange={(e) =>
+                            setWorkerForm((f) => ({
+                              ...f,
+                              preRetraiteDay: e.target.checked ? (f.preRetraiteDay || 'MONDAY') : '',
+                            }))
+                          }
+                        />
+                        <span className="text-xs text-gray-700">Pré-retraite</span>
+                        {workerForm.preRetraiteDay && (
+                          <select
+                            className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs"
+                            value={workerForm.preRetraiteDay}
+                            onChange={(e) =>
+                              setWorkerForm((f) => ({
+                                ...f,
+                                preRetraiteDay: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="MONDAY">Lundi</option>
+                            <option value="TUESDAY">Mardi</option>
+                            <option value="WEDNESDAY">Mercredi</option>
+                            <option value="THURSDAY">Jeudi</option>
+                            <option value="FRIDAY">Vendredi</option>
+                          </select>
+                        )}
+                      </div>
+                    ) : w.preRetraiteDay ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800">
+                        Pré-retraite&nbsp;
+                        {{
+                          MONDAY: 'Lundi',
+                          TUESDAY: 'Mardi',
+                          WEDNESDAY: 'Mercredi',
+                          THURSDAY: 'Jeudi',
+                          FRIDAY: 'Vendredi',
+                        }[w.preRetraiteDay as 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY'] ?? ''}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Aucune</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-right space-x-2">

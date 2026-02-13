@@ -369,6 +369,8 @@ export default function PlanManagement() {
     previousPostId: string | null;
     previousPresenceType: WorkerType;
   } | null>(null);
+  const [preRetraiteInfo, setPreRetraiteInfo] = useState<string[] | null>(null);
+  const [preRetraiteAppliedPlanId, setPreRetraiteAppliedPlanId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -395,6 +397,50 @@ export default function PlanManagement() {
       fetchAssignments(currentPlan.id);
     }
   }, [currentPlan, fetchAssignments]);
+
+  // Automatically apply PRERETRAITE presence based on weekly pré-retraite day when loading a plan.
+  useEffect(() => {
+    const applyPreRetraiteForPlan = async () => {
+      if (!currentPlan?.id || !currentPlan.date) return;
+      if (preRetraiteAppliedPlanId === currentPlan.id) return;
+
+      const planDate = new Date(currentPlan.date);
+      const weekday = planDate.getDay(); // 0=Sunday, 1=Monday, ... 6=Saturday
+      const weekdayKey =
+        weekday === 1
+          ? 'MONDAY'
+          : weekday === 2
+            ? 'TUESDAY'
+            : weekday === 3
+              ? 'WEDNESDAY'
+              : weekday === 4
+                ? 'THURSDAY'
+                : weekday === 5
+                  ? 'FRIDAY'
+                  : null;
+      if (!weekdayKey) {
+        setPreRetraiteAppliedPlanId(currentPlan.id);
+        return;
+      }
+
+      const affected = workers.filter((w) => w.preRetraiteDay === weekdayKey);
+      if (affected.length === 0) {
+        setPreRetraiteAppliedPlanId(currentPlan.id);
+        return;
+      }
+
+      for (const w of affected) {
+        await updateWorkerPresence(currentPlan.id, w.id, WorkerType.PRERETRAITE);
+      }
+
+      setPreRetraiteAppliedPlanId(currentPlan.id);
+      setPreRetraiteInfo(
+        affected.map((w) => `(${w.anciennete}) ${w.name}`)
+      );
+    };
+
+    void applyPreRetraiteForPlan();
+  }, [currentPlan, workers, updateWorkerPresence, preRetraiteAppliedPlanId]);
 
   useEffect(() => {
     const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -959,6 +1005,37 @@ export default function PlanManagement() {
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
                 Assigner les remplaçants
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {preRetraiteInfo && (
+        <div className="fixed bottom-4 right-4 z-40 max-w-sm w-full mx-4">
+          <div className="bg-white border border-amber-200 shadow-lg rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <div className="mt-0.5 h-6 w-6 flex items-center justify-center rounded-full bg-amber-100 text-amber-700 text-sm font-bold">
+                !
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-amber-800 mb-1">Pré-retraite aujourd&apos;hui</h3>
+                <p className="text-xs text-gray-700 mb-1">
+                  Les travailleurs suivants sont automatiquement placés en <span className="font-semibold">Pré-retraite</span> pour ce plan :
+                </p>
+                <ul className="text-xs text-gray-800 list-disc list-inside space-y-0.5">
+                  {preRetraiteInfo.map((label) => (
+                    <li key={label}>{label}</li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreRetraiteInfo(null)}
+                className="ml-2 text-gray-400 hover:text-gray-600"
+                aria-label="Fermer"
+              >
+                ✕
               </button>
             </div>
           </div>

@@ -16,6 +16,8 @@ export default function CreateWorkerModal({
   const [name, setName] = useState('');
   const [type, setType] = useState<WorkerType>(WorkerType.PERMANENT_JOUR);
   const [originalPostId, setOriginalPostId] = useState(posts[0]?.id || '');
+  const [preRetraiteEnabled, setPreRetraiteEnabled] = useState(false);
+  const [preRetraiteDay, setPreRetraiteDay] = useState<'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY'>('MONDAY');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,6 +37,7 @@ export default function CreateWorkerModal({
         name,
         type,
         originalPostId,
+        preRetraiteDay: preRetraiteEnabled ? preRetraiteDay : null,
       });
       onClose();
     } catch (err: any) {
@@ -108,6 +111,35 @@ export default function CreateWorkerModal({
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Pré-retraite
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={preRetraiteEnabled}
+                onChange={(e) => setPreRetraiteEnabled(e.target.checked)}
+              />
+              <span className="text-sm text-gray-700">Activer la pré-retraite</span>
+              {preRetraiteEnabled && (
+                <select
+                  className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm"
+                  value={preRetraiteDay}
+                  onChange={(e) =>
+                    setPreRetraiteDay(e.target.value as 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY')
+                  }
+                >
+                  <option value="MONDAY">Lundi</option>
+                  <option value="TUESDAY">Mardi</option>
+                  <option value="WEDNESDAY">Mercredi</option>
+                  <option value="THURSDAY">Jeudi</option>
+                  <option value="FRIDAY">Vendredi</option>
+                </select>
+              )}
+            </div>
           </div>
           <div className="flex justify-end space-x-4">
             <button

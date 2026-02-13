@@ -1,9 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
-  // Explicit path so TypeScript and Node always use this client (fixes workspace/CI where @prisma/client resolves elsewhere)
   output   = "../src/generated/prisma"
 }
 
@@ -12,183 +8,160 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum WorkerType {
-  // 6 origin types (Worker.type and create-worker dropdown only)
-  PERMANENT_JOUR
-  PERMANENT_SOIR
-  OCCASIONEL_DU_JOUR
-  OCCASIONEL_SOIR   // label: Occasionel du soir
-  MOBILITE_DU_JOUR
-  MOBILITE_DU_SOIR
-  // Presence-only / legacy (WorkerPresence; not in create-worker dropdown)
-  JOUR
-  SOIR
-  ABSENT
-  VACANCES
-  LIBERATION_EXTERNE
-  INVALIDITE
-  PRERETRAITE
-  CONGE_PARENTAL
-}
-
 model Worker {
-  id            String      @id @default(cuid())
-  anciennete    String      @unique  // was "matricule", label: Ancienneté
-  name          String
-  type          WorkerType  @default(PERMANENT_JOUR) // Origin type, one of the 6
-  originalPostId String
-  originalPost  Post        @relation("OriginalPost", fields: [originalPostId], references: [id])
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  
-  assignments   Assignment[]
-  assignmentInteractions AssignmentInteraction[]
-  presences     WorkerPresence[]
-  bookingAssignments BookingAssignment[]
+  id                   String               @id @default(cuid())
+  anciennete           String               @unique(map: "Worker_matricule_key")
+  name                 String
+  type                 WorkerType           @default(PERMANENT_JOUR)
+  originalPostId       String
+  /// Weekly pre-retirement day (e.g. MONDAY–FRIDAY). When a plan's date matches this weekday,
+  /// the worker is automatically marked as PRERETRAITE for that plan.
+  preRetraiteDay       String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  assignments          Assignment[]
+  bookingAssignments   BookingAssignment[]
   bookingReplacements1 BookingReplacement[] @relation("Replacement1")
   bookingReplacements2 BookingReplacement[] @relation("Replacement2")
   bookingReplacements3 BookingReplacement[] @relation("Replacement3")
   bookingReplacements4 BookingReplacement[] @relation("Replacement4")
+  originalPost         Post                 @relation("OriginalPost", fields: [originalPostId], references: [id])
+  presences            WorkerPresence[]
 
-  @@index([anciennete])
   @@index([type])
+  @@index([anciennete], map: "Worker_matricule_idx")
 }
 
 model Post {
-  id            String      @id @default(cuid())
-  name          String
-  description   String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  
-  originalWorkers Worker[]  @relation("OriginalPost")
-  assignments   Assignment[]
-  assignmentInteractions AssignmentInteraction[]
-  bookingAssignments BookingAssignment[]
+  id                  String               @id @default(cuid())
+  name                String
+  description         String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  assignments         Assignment[]
+  bookingAssignments  BookingAssignment[]
   bookingReplacements BookingReplacement[]
+  originalWorkers     Worker[]             @relation("OriginalPost")
 
   @@index([name])
 }
 
 model Plan {
-  id            String      @id @default(cuid())
-  name          String      // e.g., "2025-01-24" or "Plan du 24 Janvier"
-  date          DateTime?   // Optional date for the plan
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  createdBy     String?     // Manager ID or name
-  
-  assignments   Assignment[]
-  assignmentInteractions AssignmentInteraction[]
+  id              String           @id @default(cuid())
+  name            String
+  date            DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+  createdBy       String?
+  assignments     Assignment[]
   workerPresences WorkerPresence[]
-  
+
   @@index([name])
   @@index([date])
 }
 
 model Assignment {
-  id            String      @id @default(cuid())
-  planId        String
-  plan          Plan        @relation(fields: [planId], references: [id], onDelete: Cascade)
-  workerId      String
-  worker        Worker      @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  postId        String
-  post          Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
-  assignedAt    DateTime    @default(now())
-  assignedBy    String?     // Manager ID or name
-  
-  @@unique([planId, workerId]) // One worker can only be assigned to one post per plan
+  id         String   @id @default(cuid())
+  workerId   String
+  postId     String
+  assignedAt DateTime @default(now())
+  assignedBy String?
+  planId     String
+  plan       Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  worker     Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, workerId])
+  @@unique([workerId, postId, assignedAt])
   @@index([planId])
   @@index([workerId])
   @@index([postId])
 }
 
-// Tracks each time a worker is assigned to a post within a plan (for interaction / migration history).
-model AssignmentInteraction {
-  id        String    @id @default(cuid())
-  planId    String
-  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
-  workerId  String
-  worker    Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  postId    String
-  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  startedAt DateTime @default(now())
-  endedAt   DateTime? // null = still at this post (or computed at export with 8h rule)
-  
-  @@index([planId])
-  @@index([workerId])
-}
-
 model WorkerPresence {
-  id            String      @id @default(cuid())
-  planId        String
-  plan          Plan        @relation(fields: [planId], references: [id], onDelete: Cascade)
-  workerId      String
-  worker        Worker      @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  type          WorkerType  // Presence type for this specific plan
-  updatedAt     DateTime    @default(now()) @updatedAt
-  
-  @@unique([planId, workerId]) // One presence record per worker per plan
+  id        String     @id @default(cuid())
+  planId    String
+  workerId  String
+  type      WorkerType
+  updatedAt DateTime   @default(now()) @updatedAt
+  plan      Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  worker    Worker     @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, workerId])
   @@index([planId])
   @@index([workerId])
   @@index([type])
 }
 
-// Saved booking: snapshot of worker->post for a future effective date. Does not change workers until "activated".
 model Booking {
-  id             String    @id @default(cuid())
-  name           String
-  effectiveDate  DateTime  // Date when this booking is intended to take effect
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  assignments    BookingAssignment[]
-  replacements   BookingReplacement[]
+  id            String               @id @default(cuid())
+  name          String
+  effectiveDate DateTime
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  assignments   BookingAssignment[]
+  replacements  BookingReplacement[]
 
   @@index([effectiveDate])
 }
 
 model BookingAssignment {
-  id         String   @id @default(cuid())
-  bookingId  String
-  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  workerId   String
-  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  postId     String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  bookingId String
+  workerId  String
+  postId    String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  post      Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  worker    Worker  @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
   @@unique([bookingId, workerId])
   @@index([bookingId])
 }
 
-// Per-booking replacement rules: 4 slots — 2 "du jour", 2 "du soir".
 model BookingReplacement {
-  id                   String   @id @default(cuid())
+  id                   String  @id @default(cuid())
   bookingId            String
-  booking             Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   postId               String
-  post                Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   replacement1WorkerId String?
-  replacement1Worker   Worker?  @relation("Replacement1", fields: [replacement1WorkerId], references: [id], onDelete: SetNull)
   replacement2WorkerId String?
-  replacement2Worker   Worker?  @relation("Replacement2", fields: [replacement2WorkerId], references: [id], onDelete: SetNull)
   replacement3WorkerId String?
-  replacement3Worker   Worker?  @relation("Replacement3", fields: [replacement3WorkerId], references: [id], onDelete: SetNull)
   replacement4WorkerId String?
-  replacement4Worker   Worker?  @relation("Replacement4", fields: [replacement4WorkerId], references: [id], onDelete: SetNull)
+  booking              Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  post                 Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  replacement1Worker   Worker? @relation("Replacement1", fields: [replacement1WorkerId], references: [id])
+  replacement2Worker   Worker? @relation("Replacement2", fields: [replacement2WorkerId], references: [id])
+  replacement3Worker   Worker? @relation("Replacement3", fields: [replacement3WorkerId], references: [id])
+  replacement4Worker   Worker? @relation("Replacement4", fields: [replacement4WorkerId], references: [id])
 
   @@unique([bookingId, postId])
   @@index([bookingId])
 }
 
 model Manager {
-  id            String      @id @default(cuid())
-  username      String      @unique
-  email         String      @unique
-  passwordHash  String
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id           String   @id @default(cuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([username])
   @@index([email])
+}
+
+enum WorkerType {
+  JOUR
+  SOIR
+  ABSENT
+  OCCASIONEL_DU_JOUR
+  OCCASIONEL_SOIR
+  VACANCES
+  LIBERATION_EXTERNE
+  INVALIDITE
+  PRERETRAITE
+  CONGE_PARENTAL
+  PERMANENT_JOUR
+  PERMANENT_SOIR
+  MOBILITE_DU_JOUR
+  MOBILITE_DU_SOIR
 }
