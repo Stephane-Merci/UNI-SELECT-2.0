@@ -86,6 +86,8 @@ interface AppState {
   updateWorkerType: (workerId: string, type: WorkerType) => Promise<void>;
   updateWorkerOriginalPost: (workerId: string, originalPostId: string) => Promise<void>;
   removeAssignment: (assignmentId: string) => Promise<void>;
+  addUnfilledPosition: (planId: string, postId: string) => Promise<void>;
+  deleteUnfilledPosition: (unfilledPositionId: string) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -465,6 +467,46 @@ export const useStore = create<AppState>((set, get) => ({
       await apiClient.delete(`/assignments/${assignmentId}`);
     } catch (error: any) {
       set({ assignments: previousAssignments, error: error.message });
+      throw error;
+    }
+  },
+
+  addUnfilledPosition: async (planId, postId) => {
+    try {
+      const response = await apiClient.post(`/plans/${planId}/unfilled-positions`, { postId });
+      set((state) => {
+        if (state.currentPlan?.id === planId) {
+          return {
+            currentPlan: {
+              ...state.currentPlan,
+              unfilledPositions: [...(state.currentPlan.unfilledPositions || []), response.data],
+            },
+          };
+        }
+        return state;
+      });
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
+  },
+
+  deleteUnfilledPosition: async (unfilledPositionId) => {
+    try {
+      await apiClient.delete(`/plans/unfilled-positions/${unfilledPositionId}`);
+      set((state) => {
+        if (state.currentPlan) {
+          return {
+            currentPlan: {
+              ...state.currentPlan,
+              unfilledPositions: state.currentPlan.unfilledPositions?.filter((up) => up.id !== unfilledPositionId),
+            },
+          };
+        }
+        return state;
+      });
+    } catch (error: any) {
+      set({ error: error.message });
       throw error;
     }
   },

@@ -212,7 +212,10 @@ export default function WorkAllocation() {
   const fetchBookings = useCallback(async () => {
     try {
       const res = await apiClient.get<Booking[]>('/bookings');
-      setBookings(res.data || []);
+      const data = res.data || [];
+      setBookings(data);
+      const active = data.find(b => b.isActive);
+      if (active) setActiveBookingId(active.id);
     } catch {
       setBookings([]);
     }
@@ -490,6 +493,7 @@ export default function WorkAllocation() {
     try {
       await apiClient.post(`/bookings/${bookingId}/activate`);
       await fetchWorkers();
+      await fetchBookings();
       setActiveBookingId(bookingId);
     } catch (err: any) {
       alert(err?.response?.data?.error || err?.message || 'Erreur lors de l\'activation');
@@ -957,6 +961,9 @@ export default function WorkAllocation() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setApplyBookingConfirm(null)}>
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Appliquer le booking</h3>
+            <p className="text-sm text-gray-700 mb-4 font-bold text-red-600">
+              Attention : Vous êtes sur le point de changer de booking. Êtes-vous sûr ?
+            </p>
             <p className="text-sm text-gray-700 mb-4">
               {applyBookingConfirm.currentActiveName ? (
                 <>

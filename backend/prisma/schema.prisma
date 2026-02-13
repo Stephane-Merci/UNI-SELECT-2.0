@@ -42,6 +42,7 @@ model Post {
   bookingAssignments  BookingAssignment[]
   bookingReplacements BookingReplacement[]
   originalWorkers     Worker[]             @relation("OriginalPost")
+  unfilledPositions   UnfilledPosition[]
 
   @@index([name])
 }
@@ -55,9 +56,22 @@ model Plan {
   createdBy       String?
   assignments     Assignment[]
   workerPresences WorkerPresence[]
+  unfilledPositions UnfilledPosition[]
 
   @@index([name])
   @@index([date])
+}
+
+model UnfilledPosition {
+  id        String   @id @default(cuid())
+  planId    String
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([planId])
+  @@index([postId])
 }
 
 model Assignment {
@@ -99,6 +113,7 @@ model Booking {
   effectiveDate DateTime
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
+  isActive      Boolean              @default(false)
   assignments   BookingAssignment[]
   replacements  BookingReplacement[]
 

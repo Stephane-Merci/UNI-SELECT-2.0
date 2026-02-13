@@ -253,6 +253,15 @@ router.post('/:id/activate', async (req, res) => {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
+    // Deactivate all others, activate this one
+    await prisma.booking.updateMany({
+      data: { isActive: false },
+    });
+    await prisma.booking.update({
+      where: { id: req.params.id },
+      data: { isActive: true },
+    });
+
     for (const a of booking.assignments) {
       await prisma.worker.update({
         where: { id: a.workerId },

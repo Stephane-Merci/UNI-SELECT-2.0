@@ -40,7 +40,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const data = assignmentSchema.parse(req.body);
-    
+
     // Verify plan, worker and post exist
     const [plan, worker, post] = await Promise.all([
       prisma.plan.findUnique({ where: { id: data.planId } }),
@@ -112,6 +112,32 @@ router.post('/', async (req, res) => {
         },
       });
 
+      // Handle "Poste à combler" consumption on update as well
+      try {
+        const oldestUnfilled = await prisma.unfilledPosition.findFirst({
+          where: {
+            planId: data.planId,
+            postId: data.postId,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        });
+
+        if (oldestUnfilled) {
+          await prisma.unfilledPosition.delete({
+            where: { id: oldestUnfilled.id },
+          });
+          io.emit('unfilled-position-deleted', {
+            unfilledPositionId: oldestUnfilled.id,
+            planId: data.planId,
+            room: 'main',
+          });
+        }
+      } catch (upError) {
+        console.error('Error consuming unfilled position on update:', upError);
+      }
+
       io.emit('worker-assigned', {
         assignment,
         planId: data.planId,
@@ -147,6 +173,32 @@ router.post('/', async (req, res) => {
       },
     });
 
+    // Handle "Poste à combler" consumption
+    try {
+      const oldestUnfilled = await prisma.unfilledPosition.findFirst({
+        where: {
+          planId: data.planId,
+          postId: data.postId,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
+
+      if (oldestUnfilled) {
+        await prisma.unfilledPosition.delete({
+          where: { id: oldestUnfilled.id },
+        });
+        io.emit('unfilled-position-deleted', {
+          unfilledPositionId: oldestUnfilled.id,
+          planId: data.planId,
+          room: 'main',
+        });
+      }
+    } catch (upError) {
+      console.error('Error consuming unfilled position:', upError);
+    }
+
     // Emit real-time update
     io.emit('worker-assigned', {
       assignment,
@@ -163,7 +215,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-    // Remove assignment
+// Remove assignment
 router.delete('/:id', async (req, res) => {
   try {
     const assignment = await prisma.assignment.findUnique({

@@ -111,6 +111,14 @@ export interface Plan {
   createdBy?: string;
   assignments?: Assignment[];
   workerPresences?: WorkerPresence[];
+  unfilledPositions?: UnfilledPosition[];
+}
+
+export interface UnfilledPosition {
+  id: string;
+  planId: string;
+  postId: string;
+  createdAt: string;
 }
 
 export interface Assignment {
@@ -150,6 +158,7 @@ export interface Booking {
   effectiveDate: string;
   createdAt: string;
   updatedAt: string;
+  isActive: boolean;
   assignments: BookingAssignment[];
 }
 

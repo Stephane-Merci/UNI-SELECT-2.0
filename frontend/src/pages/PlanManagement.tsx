@@ -196,11 +196,17 @@ function PresencePanel({
 function SortablePostColumn({
   post,
   workers,
+  unfilledPositions,
+  onAddUnfilled,
+  onDeleteUnfilled,
   isLocked,
   onLockToggle,
 }: {
   post: Post;
   workers: Worker[];
+  unfilledPositions: any[];
+  onAddUnfilled: () => void;
+  onDeleteUnfilled: (id: string) => void;
   isLocked: boolean;
   onLockToggle: () => void;
 }) {
@@ -243,6 +249,9 @@ function SortablePostColumn({
       <PostColumn
         post={post}
         workers={workers}
+        unfilledPositions={unfilledPositions}
+        onAddUnfilled={onAddUnfilled}
+        onDeleteUnfilled={onDeleteUnfilled}
         isLocked={isLocked}
         onLockToggle={onLockToggle}
         wrapperClassName={wrapperClass}
@@ -263,6 +272,9 @@ function PostsPanel({
   attendancePresenceTypes,
   lockedPostIds,
   onPostLockToggle,
+  unfilledPositions,
+  onAddUnfilled,
+  onDeleteUnfilled,
 }: {
   posts: Post[];
   workers: Worker[];
@@ -271,6 +283,9 @@ function PostsPanel({
   attendancePresenceTypes: Set<WorkerType>;
   lockedPostIds: Set<string>;
   onPostLockToggle: (postId: string) => void;
+  unfilledPositions: any[];
+  onAddUnfilled: (postId: string) => void;
+  onDeleteUnfilled: (id: string) => void;
 }) {
   const getWorkersForPost = (postId: string) => {
     return workers
@@ -280,6 +295,10 @@ function PostsPanel({
         return !attendancePresenceTypes.has(pt);
       })
       .sort((a, b) => a.anciennete.localeCompare(b.anciennete, 'fr', { numeric: true }));
+  };
+
+  const getUnfilledForPost = (postId: string) => {
+    return unfilledPositions.filter((up) => up.postId === postId);
   };
 
   const sortablePostIds = posts
@@ -300,6 +319,9 @@ function PostsPanel({
                 key={post.id}
                 post={post}
                 workers={getWorkersForPost(post.id)}
+                unfilledPositions={getUnfilledForPost(post.id)}
+                onAddUnfilled={() => onAddUnfilled(post.id)}
+                onDeleteUnfilled={onDeleteUnfilled}
                 isLocked={lockedPostIds.has(post.id)}
                 onLockToggle={() => onPostLockToggle(post.id)}
               />
@@ -335,6 +357,8 @@ export default function PlanManagement() {
     getPlanLockedPosts,
     togglePlanPostLock,
     planLayoutVersion,
+    addUnfilledPosition,
+    deleteUnfilledPosition,
   } = useStore();
 
   // Ordered posts for current plan (persisted in localStorage); re-render when layout changes
@@ -362,7 +386,13 @@ export default function PlanManagement() {
   } | null>(null);
   const [replacementPromptSelectedId, setReplacementPromptSelectedId] = useState<string | null>(null);
   const [autoAssignReplacementPrompt, setAutoAssignReplacementPrompt] = useState<{
-    items: { postId: string; postName: string; workerIds: string[] }[];
+    items: {
+      postId: string;
+      postName: string;
+      shift: 'jour' | 'soir';
+      options: { id: string; name: string; anciennete: string }[];
+      selectedId: string | null;
+    }[];
   } | null>(null);
   const [lastPlanAction, setLastPlanAction] = useState<{
     workerId: string;
@@ -473,6 +503,18 @@ export default function PlanManagement() {
 
     socket.on('plan-updated', () => {
       fetchPlans();
+      if (currentPlan) {
+        loadPlan(currentPlan.id);
+      }
+    });
+
+    socket.on('unfilled-position-added', () => {
+      if (currentPlan) {
+        loadPlan(currentPlan.id);
+      }
+    });
+
+    socket.on('unfilled-position-deleted', () => {
       if (currentPlan) {
         loadPlan(currentPlan.id);
       }
@@ -750,23 +792,47 @@ export default function PlanManagement() {
       if (chosenBooking) {
         const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
         const replList = replRes.data ?? [];
-        const items: { postId: string; postName: string; workerIds: string[] }[] = [];
+        const items: any[] = [];
         for (const r of replList) {
           const postId = r.postId;
           const workersOnPost = workers.filter((w) => w.originalPostId === postId);
-          const allAbsent =
-            workersOnPost.length > 0 &&
-            workersOnPost.every((w) => {
+          const postName = posts.find((p) => p.id === postId)?.name ?? postId;
+
+          // Check Jour shift
+          const jourWorkers = workersOnPost.filter((w) => WORKER_TYPES_JOUR.includes(w.type));
+          const allJourAbsent =
+            jourWorkers.length > 0 &&
+            jourWorkers.every((w) => {
               const pt = presenceMap[w.id] ?? w.type;
               return ATTENDANCE_PRESENCE_TYPES.has(pt);
             });
-          if (allAbsent && workersOnPost.length > 0) {
-            const workerIds = [r.replacement1WorkerId, r.replacement2WorkerId, r.replacement3WorkerId, r.replacement4WorkerId].filter(
-              (id): id is string => !!id
-            );
-            if (workerIds.length > 0) {
-              const post = posts.find((p) => p.id === postId);
-              items.push({ postId, postName: post?.name ?? postId, workerIds });
+          if (allJourAbsent) {
+            const workerIds = [r.replacement1WorkerId, r.replacement2WorkerId].filter((id): id is string => !!id);
+            const options = workerIds
+              .map((id) => workers.find((w) => w.id === id))
+              .filter((w): w is Worker => !!w)
+              .map((w) => ({ id: w.id, name: w.name, anciennete: w.anciennete }));
+            if (options.length > 0) {
+              items.push({ postId, postName, shift: 'jour', options, selectedId: options[0].id });
+            }
+          }
+
+          // Check Soir shift
+          const soirWorkers = workersOnPost.filter((w) => WORKER_TYPES_SOIR.includes(w.type));
+          const allSoirAbsent =
+            soirWorkers.length > 0 &&
+            soirWorkers.every((w) => {
+              const pt = presenceMap[w.id] ?? w.type;
+              return ATTENDANCE_PRESENCE_TYPES.has(pt);
+            });
+          if (allSoirAbsent) {
+            const workerIds = [r.replacement3WorkerId, r.replacement4WorkerId].filter((id): id is string => !!id);
+            const options = workerIds
+              .map((id) => workers.find((w) => w.id === id))
+              .filter((w): w is Worker => !!w)
+              .map((w) => ({ id: w.id, name: w.name, anciennete: w.anciennete }));
+            if (options.length > 0) {
+              items.push({ postId, postName, shift: 'soir', options, selectedId: options[0].id });
             }
           }
         }
@@ -845,6 +911,9 @@ export default function PlanManagement() {
                 attendancePresenceTypes={ATTENDANCE_PRESENCE_TYPES}
                 lockedPostIds={lockedPostIds}
                 onPostLockToggle={(postId) => currentPlan && togglePlanPostLock(currentPlan.id, postId)}
+                unfilledPositions={currentPlan?.unfilledPositions || []}
+                onAddUnfilled={(postId) => currentPlan && addUnfilledPosition(currentPlan.id, postId)}
+                onDeleteUnfilled={deleteUnfilledPosition}
               />
             </div>
 
@@ -969,34 +1038,55 @@ export default function PlanManagement() {
             className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Remplaçants disponibles</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Sélection des remplaçants</h3>
             <p className="text-sm text-gray-700 mb-4">
-              L&apos;assignement automatique a affecté chaque travailleur à son poste d&apos;origine. Certains postes
-              n&apos;ont plus de travailleurs présents (tous absents) mais ont des remplaçants définis dans le booking.
-              Souhaitez-vous assigner ces remplaçants aux postes concernés ?
+              Certains postes n&apos;ont plus de travailleurs présents. Choisissez un remplaçant pour chaque poste/quart :
             </p>
-            <ul className="text-sm text-gray-600 mb-4 list-disc list-inside space-y-1">
-              {autoAssignReplacementPrompt.items.map(({ postId, postName, workerIds }) => (
-                <li key={postId}>
-                  <span className="font-medium">{postName}</span>
-                  {' '}({workerIds.length} remplaçant{workerIds.length > 1 ? 's' : ''})
-                </li>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto mb-6 pr-2">
+              {autoAssignReplacementPrompt.items.map((item, idx) => (
+                <div key={`${item.postId}-${item.shift}`} className="border-b pb-3 last:border-0">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-gray-900">
+                      {item.postName} <span className="text-gray-500 font-normal">({item.shift === 'jour' ? 'Jour' : 'Soir'})</span>
+                    </span>
+                  </div>
+                  <select
+                    value={item.selectedId || ''}
+                    onChange={(e) => {
+                      const val = e.target.value || null;
+                      setAutoAssignReplacementPrompt(prev => {
+                        if (!prev) return null;
+                        const nextItems = [...prev.items];
+                        nextItems[idx] = { ...nextItems[idx], selectedId: val };
+                        return { items: nextItems };
+                      });
+                    }}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm cursor-pointer hover:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="">-- Ne pas assigner --</option>
+                    {item.options.map(opt => (
+                      <option key={opt.id} value={opt.id}>
+                        ({opt.anciennete}) {opt.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ))}
-            </ul>
+            </div>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setAutoAssignReplacementPrompt(null)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
-                Ne pas assigner
+                Annuler
               </button>
               <button
                 type="button"
                 onClick={async () => {
-                  for (const { postId, workerIds } of autoAssignReplacementPrompt.items) {
-                    for (const workerId of workerIds) {
-                      await assignWorker(currentPlan.id, workerId, postId);
+                  for (const item of autoAssignReplacementPrompt.items) {
+                    if (item.selectedId) {
+                      await assignWorker(currentPlan.id, item.selectedId, item.postId);
                     }
                   }
                   await fetchAssignments(currentPlan.id);
@@ -1004,7 +1094,7 @@ export default function PlanManagement() {
                 }}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
-                Assigner les remplaçants
+                Appliquer les sélections
               </button>
             </div>
           </div>

@@ -25,6 +25,7 @@ router.get('/', async (req, res) => {
             post: true,
           },
         },
+        unfilledPositions: true,
         workerPresences: {
           include: {
             worker: {
@@ -96,6 +97,7 @@ router.get('/:id', async (req, res) => {
             post: true,
           },
         },
+        unfilledPositions: true,
         workerPresences: {
           include: {
             worker: {
@@ -121,12 +123,12 @@ router.post('/', async (req, res) => {
   try {
     // Check if prisma.plan exists (client needs to be regenerated)
     if (!prisma.plan) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Prisma client not regenerated. Please run: npx prisma generate',
         details: 'The Plan model was added to the schema but Prisma client needs to be regenerated'
       });
     }
-    
+
     const data = planSchema.parse(req.body);
     const plan = await prisma.plan.create({
       data: {
@@ -172,6 +174,7 @@ router.post('/', async (req, res) => {
             post: true,
           },
         },
+        unfilledPositions: true,
         workerPresences: {
           include: {
             worker: {
@@ -199,17 +202,17 @@ router.post('/', async (req, res) => {
     // Provide more detailed error message
     const errorMessage = error?.message || 'Failed to create plan';
     const isDatabaseError = error?.code === 'P2002' || error?.code === 'P2003' || error?.code === 'P2014';
-    
+
     if (isDatabaseError) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Database error. Please ensure migrations have been run: npx prisma migrate dev',
-        details: errorMessage 
+        details: errorMessage
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Failed to create plan',
-      details: errorMessage 
+      details: errorMessage
     });
   }
 });
@@ -308,6 +311,7 @@ router.post('/:id/copy', async (req, res) => {
             post: true,
           },
         },
+        unfilledPositions: true,
         workerPresences: {
           include: {
             worker: {
@@ -353,6 +357,7 @@ router.put('/:id', async (req, res) => {
             post: true,
           },
         },
+        unfilledPositions: true,
         workerPresences: {
           include: {
             worker: {
@@ -404,7 +409,7 @@ router.put('/:id/presence/:workerId', async (req, res) => {
   try {
     const { type } = req.body;
     const { WorkerType } = await import('../generated/prisma');
-    
+
     if (!Object.values(WorkerType).includes(type)) {
       return res.status(400).json({ error: 'Invalid worker type' });
     }
@@ -443,6 +448,59 @@ router.put('/:id/presence/:workerId', async (req, res) => {
     res.json(presence);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update worker presence' });
+  }
+});
+
+// Add unfilled position to a post in a plan
+router.post('/:id/unfilled-positions', async (req, res) => {
+  try {
+    const { postId } = req.body;
+    if (!postId) {
+      return res.status(400).json({ error: 'postId is required' });
+    }
+
+    const unfilledPosition = await prisma.unfilledPosition.create({
+      data: {
+        planId: req.params.id,
+        postId: postId,
+      },
+    });
+
+    io.emit('unfilled-position-added', {
+      unfilledPosition,
+      planId: req.params.id,
+      room: 'main',
+    });
+
+    res.status(201).json(unfilledPosition);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to add unfilled position' });
+  }
+});
+
+// Delete unfilled position
+router.delete('/unfilled-positions/:id', async (req, res) => {
+  try {
+    const up = await prisma.unfilledPosition.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!up) {
+      return res.status(404).json({ error: 'Unfilled position not found' });
+    }
+
+    await prisma.unfilledPosition.delete({
+      where: { id: req.params.id },
+    });
+
+    io.emit('unfilled-position-deleted', {
+      unfilledPositionId: req.params.id,
+      planId: up.planId,
+      room: 'main',
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete unfilled position' });
   }
 });
 

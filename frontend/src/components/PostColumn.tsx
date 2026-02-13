@@ -1,13 +1,17 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Post, Worker } from '../types';
+import { Post, Worker, UnfilledPosition } from '../types';
 import WorkerCard, { POST_DRAG_PREFIX, POST_DRAG_SEP } from './WorkerCard';
+import UnfilledPositionCard from './UnfilledPositionCard';
 
 export const POST_COLUMN_DRAG_PREFIX = 'post-column-';
 
 interface PostColumnProps {
   post: Post;
   workers: Worker[];
+  unfilledPositions?: UnfilledPosition[];
+  onAddUnfilled?: () => void;
+  onDeleteUnfilled?: (id: string) => void;
   /** When set, show a "Remplaçants" button (Booking page only). Plan page does not pass this. */
   onReplacementClick?: () => void;
   /** Plan page: show lock icon; locked posts cannot be moved. */
@@ -22,6 +26,9 @@ interface PostColumnProps {
 export default function PostColumn({
   post,
   workers,
+  unfilledPositions = [],
+  onAddUnfilled,
+  onDeleteUnfilled,
   onReplacementClick,
   isLocked,
   onLockToggle,
@@ -41,6 +48,19 @@ export default function PostColumn({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-0.5">
+        {onAddUnfilled && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onAddUnfilled(); }}
+            className="p-0.5 text-blue-600 hover:bg-blue-100 rounded"
+            title="Ajouter un poste à combler"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+          </button>
+        )}
         {onLockToggle != null && (
           <button
             type="button"
@@ -96,15 +116,21 @@ export default function PostColumn({
           strategy={verticalListSortingStrategy}
         >
           <div className="flex flex-col gap-1 min-h-0">
-            {workers.length > 0 ? (
-              workers.map((worker) => (
-                <WorkerCard
-                  key={worker.id}
-                  worker={worker}
-                  dragId={`${POST_DRAG_PREFIX}${post.id}${POST_DRAG_SEP}${worker.id}`}
-                />
-              ))
-            ) : (
+            {workers.map((worker) => (
+              <WorkerCard
+                key={worker.id}
+                worker={worker}
+                dragId={`${POST_DRAG_PREFIX}${post.id}${POST_DRAG_SEP}${worker.id}`}
+              />
+            ))}
+            {unfilledPositions.map((up) => (
+              <UnfilledPositionCard
+                key={up.id}
+                unfilledPosition={up}
+                onDelete={onDeleteUnfilled ? () => onDeleteUnfilled(up.id) : undefined}
+              />
+            ))}
+            {workers.length === 0 && unfilledPositions.length === 0 && (
               <p className="text-[10px] text-gray-400 italic text-center py-2">
                 Aucun travailleur assigné
               </p>

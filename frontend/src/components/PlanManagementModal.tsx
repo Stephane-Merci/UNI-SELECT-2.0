@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { Plan, WorkerTypeColors } from '../types';
 import apiClient from '../api/client';
@@ -35,6 +35,23 @@ export default function PlanManagementModal({
   const [deleteStart, setDeleteStart] = useState('');
   const [deleteEnd, setDeleteEnd] = useState('');
   const { deletePlansByRange, fetchPlans, deletePlan } = useStore();
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  const autoName = `Plan for ${formatDate(planDate)}`;
+
+  // Auto-fill name based on date if it's empty or matches a previous auto-fill
+  useEffect(() => {
+    if (activeTab === 'create' || activeTab === 'copy') {
+      if (!planName || planName.startsWith('Plan for ')) {
+        setPlanName(autoName);
+      }
+    }
+  }, [planDate, activeTab]);
 
   const handleCreatePlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,7 +178,7 @@ export default function PlanManagementModal({
           const text = await err.response.data.text();
           const parsed = text.startsWith('{') ? JSON.parse(text) : null;
           if (parsed?.error) msg = parsed.error;
-        } catch (_) {}
+        } catch (_) { }
       } else if (err?.response?.data?.error) {
         msg = err.response.data.error;
       } else if (err?.message) {
@@ -346,31 +363,28 @@ export default function PlanManagementModal({
         <div className="flex space-x-4 mb-6 border-b">
           <button
             onClick={() => setActiveTab('list')}
-            className={`px-4 py-2 font-medium ${
-              activeTab === 'list'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === 'list'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
           >
             Plans Existants
           </button>
           <button
             onClick={() => setActiveTab('create')}
-            className={`px-4 py-2 font-medium ${
-              activeTab === 'create'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === 'create'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
           >
             Nouveau Plan
           </button>
           <button
             onClick={() => setActiveTab('copy')}
-            className={`px-4 py-2 font-medium ${
-              activeTab === 'copy'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === 'copy'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
           >
             Copier un Plan
           </button>
@@ -491,11 +505,10 @@ export default function PlanManagementModal({
                 {plans.map((plan) => (
                   <div
                     key={plan.id}
-                    className={`p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 ${
-                      currentPlan?.id === plan.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200'
-                    }`}
+                    className={`p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 ${currentPlan?.id === plan.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200'
+                      }`}
                     onClick={async (e) => {
                       if ((e.target as HTMLElement).closest('[data-plan-actions]')) return;
                       await onPlanSelect(plan.id);
