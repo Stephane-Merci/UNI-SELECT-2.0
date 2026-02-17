@@ -34,10 +34,9 @@ export default function Admin() {
     preRetraiteDay: '',
   });
 
-  const [accountForm, setAccountForm] = useState<{ username: string; email: string; password: string }>({
+  const [accountForm, setAccountForm] = useState<{ username: string; email: string }>({
     username: '',
     email: '',
-    password: '',
   });
   const [accountMessage, setAccountMessage] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -153,17 +152,18 @@ export default function Admin() {
     setAccountMessage('');
     setError('');
     setLoading(true);
+
     try {
-      await apiClient.post('/auth/register', {
+      const response = await apiClient.post('/auth/register', {
         username: accountForm.username,
         email: accountForm.email,
-        password: accountForm.password,
       });
-      setAccountMessage('Compte créé avec succès.');
-      setAccountForm({ username: '', email: '', password: '' });
-      setTimeout(() => setAccountMessage(''), 4000);
+      setAccountMessage(response.data.message || 'Invitation envoyée avec succès (valide 1 semaine).');
+      setAccountForm({ username: '', email: '' });
+      setTimeout(() => setAccountMessage(''), 8000);
     } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || 'Erreur lors de la création du compte');
+      const msg = e?.response?.data?.error || e?.message || 'Erreur lors de la création du compte';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -446,56 +446,63 @@ export default function Admin() {
       {/* Accounts management */}
       <section>
         <h2 className="text-xl font-semibold text-gray-800 mb-3">Comptes (Managers)</h2>
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-4 max-w-md">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-6 max-w-lg">
+          <p className="text-sm text-gray-600 mb-4">
+            Créez un nouveau compte pour un manager. Un email sera envoyé pour définir le mot de passe.
+          </p>
+
           {accountMessage && (
-            <div className="mb-3 p-2 rounded bg-green-50 text-green-800 text-sm">
+            <div className="mb-4 p-3 rounded bg-green-50 text-green-800 text-sm border border-green-200">
               {accountMessage}
             </div>
           )}
-          <form onSubmit={handleCreateAccount} className="space-y-3">
+
+          {error && (
+            <div className="mb-4 p-3 rounded bg-red-50 text-red-800 text-sm border border-red-200">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleCreateAccount} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nom d'utilisateur
+                Nom d'utilisateur <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={accountForm.username}
                 onChange={(e) => setAccountForm((f) => ({ ...f, username: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ex: jdoe"
                 required
               />
+              <p className="mt-1 text-xs text-gray-500">Utilisé pour la connexion. Format libre, min 3 caractères.</p>
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+                Email <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 value={accountForm.email}
                 onChange={(e) => setAccountForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ex: john.doe@example.com"
                 required
               />
+              <p className="mt-1 text-xs text-gray-500">L'utilisateur recevra un lien pour définir son mot de passe.</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mot de passe
-              </label>
-              <input
-                type="password"
-                value={accountForm.password}
-                onChange={(e) => setAccountForm((f) => ({ ...f, password: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                required
-              />
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white text-sm font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+              >
+                {loading ? 'Création en cours...' : 'Envoyer l\'invitation'}
+              </button>
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              Créer un compte
-            </button>
           </form>
         </div>
       </section>
@@ -507,4 +514,3 @@ export default function Admin() {
     </div>
   );
 }
-

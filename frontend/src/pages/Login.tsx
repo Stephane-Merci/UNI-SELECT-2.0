@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 
 export default function Login() {
@@ -94,6 +94,12 @@ export default function Login() {
             >
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
+          </div>
+
+          <div className="text-center mt-4">
+            <Link to="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-500">
+              Mot de passe oublié ?
+            </Link>
           </div>
         </form>
       </div>

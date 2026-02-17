@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useAuthStore } from '../store/useAuthStore';
+import ChangePasswordModal from './ChangePasswordModal';
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ export default function Layout() {
   const { fetchWorkers, fetchPosts } = useStore();
   const { logout } = useAuthStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,6 +91,16 @@ export default function Layout() {
                     >
                       Administration
                     </Link>
+                    <div className="border-t border-gray-100 my-1"></div>
+                    <button
+                      onClick={() => {
+                        setShowChangePassword(true);
+                        setDropdownOpen(false);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Changer mon mot de passe
+                    </button>
                   </div>
                 )}
               </div>
@@ -107,6 +119,11 @@ export default function Layout() {
       <main className="w-full py-6 px-4 sm:px-6 lg:px-8 min-w-0">
         <Outlet />
       </main>
+
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
     </div>
   );
 }
+

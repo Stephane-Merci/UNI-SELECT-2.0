@@ -9,6 +9,8 @@ import Admin from './pages/Admin';
 import Documentation from './pages/Documentation';
 import Login from './pages/Login';
 import { useAuthStore } from './store/useAuthStore';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
@@ -20,9 +22,17 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route 
-          path="/login" 
-          element={isAuthenticated ? <Navigate to="/" /> : <Login />} 
+        <Route
+          path="/login"
+          element={isAuthenticated ? <Navigate to="/" /> : <Login />}
+        />
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
+        />
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
         />
         <Route
           path="/"

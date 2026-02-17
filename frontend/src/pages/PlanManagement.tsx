@@ -375,6 +375,7 @@ export default function PlanManagement() {
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(50); // Percentage
   const [isResizing, setIsResizing] = useState(false);
+  const [isResizeLocked, setIsResizeLocked] = useState(false);
   const [presenceSearchFilter, setPresenceSearchFilter] = useState('');
   const [replacementPrompt, setReplacementPrompt] = useState<{
     postId: string;
@@ -709,6 +710,7 @@ export default function PlanManagement() {
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isResizeLocked) return;
     e.preventDefault();
     setIsResizing(true);
   };
@@ -917,13 +919,36 @@ export default function PlanManagement() {
               />
             </div>
 
-            {/* Resizer */}
-            <div
-              onMouseDown={handleMouseDown}
-              className={`w-1 bg-gray-300 hover:bg-blue-500 cursor-col-resize transition-colors ${isResizing ? 'bg-blue-500' : ''
-                }`}
-              style={{ minWidth: '4px' }}
-            />
+            {/* Resizer with Lock */}
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsResizeLocked(!isResizeLocked)}
+                className={`p-1.5 rounded-full shadow-sm border transition-all z-10 ${isResizeLocked
+                    ? 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'
+                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                  }`}
+                title={isResizeLocked ? "Déverrouiller le redimensionnement" : "Verrouiller le redimensionnement"}
+              >
+                {isResizeLocked ? (
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2H7V7a3 3 0 016 0 3 3 0 013 3 1 1 0 002 0 5 5 0 00-5-5z" />
+                  </svg>
+                )}
+              </button>
+              <div
+                onMouseDown={handleMouseDown}
+                className={`w-1 flex-1 bg-gray-300 transition-colors ${isResizeLocked
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'hover:bg-blue-500 cursor-col-resize'
+                  } ${isResizing ? 'bg-blue-500' : ''}`}
+                style={{ minWidth: '4px' }}
+              />
+            </div>
 
             {/* Right Panel - Presence */}
             <div
