@@ -50,13 +50,16 @@ export default function Admin() {
 
   const filteredWorkers = useMemo(() => {
     const q = workerSearch.trim().toLowerCase();
-    if (!q) return workers;
-    return workers.filter(
-      (w) =>
-        w.name.toLowerCase().includes(q) ||
-        w.anciennete.toLowerCase().includes(q) ||
-        (w.originalPost?.name ?? '').toLowerCase().includes(q)
-    );
+    const result = q
+      ? workers.filter(
+        (w) =>
+          w.name.toLowerCase().includes(q) ||
+          w.anciennete.toLowerCase().includes(q) ||
+          (w.originalPost?.name ?? '').toLowerCase().includes(q)
+      )
+      : workers;
+
+    return [...result].sort((a, b) => a.name.localeCompare(b.name));
   }, [workers, workerSearch]);
 
   const filteredPosts = useMemo(() => {

@@ -42,12 +42,12 @@ export default function PlanManagementModal({
     return `${d}/${m}/${y}`;
   };
 
-  const autoName = `Plan for ${formatDate(planDate)}`;
+  const autoName = `Plan du ${formatDate(planDate)}`;
 
   // Auto-fill name based on date if it's empty or matches a previous auto-fill
   useEffect(() => {
     if (activeTab === 'create' || activeTab === 'copy') {
-      if (!planName || planName.startsWith('Plan for ')) {
+      if (!planName || planName.startsWith('Plan du ')) {
         setPlanName(autoName);
       }
     }

@@ -14,7 +14,7 @@ export default function UnfilledPositionCard({
             data-id={unfilledPosition.id}
             className="rounded px-1 py-0.5 shadow-sm border border-gray-300 bg-gray-100 text-[10px] leading-tight w-[110px] max-w-full min-w-0 overflow-hidden group"
         >
-            <div className="flex items-center justify-between gap-1 text-gray-400 italic">
+            <div className="flex items-center justify-between gap-1 text-black">
                 <div className="flex items-center gap-1 truncate">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
