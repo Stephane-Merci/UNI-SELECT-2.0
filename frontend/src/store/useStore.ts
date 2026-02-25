@@ -83,7 +83,7 @@ interface AppState {
   deletePost: (postId: string) => Promise<void>;
   assignWorker: (planId: string, workerId: string, postId: string) => Promise<void>;
   updateWorkerPresence: (planId: string, workerId: string, type: WorkerType) => Promise<void>;
-  updateWorkerType: (workerId: string, type: WorkerType) => Promise<void>;
+  updateWorkerType: (workerId: string, type: WorkerType, absenceEndDate?: string | null) => Promise<void>;
   updateWorkerOriginalPost: (workerId: string, originalPostId: string) => Promise<void>;
   removeAssignment: (assignmentId: string) => Promise<void>;
   addUnfilledPosition: (planId: string, postId: string) => Promise<void>;
@@ -410,17 +410,17 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  updateWorkerType: async (workerId, type) => {
+  updateWorkerType: async (workerId, type, absenceEndDate) => {
     // Optimistic update
     const previousWorkers = get().workers;
     set((state) => ({
       workers: state.workers.map((w) =>
-        w.id === workerId ? { ...w, type } : w
+        w.id === workerId ? { ...w, type, absenceEndDate: absenceEndDate ?? w.absenceEndDate } : w
       ),
     }));
 
     try {
-      const response = await apiClient.patch(`/workers/${workerId}/type`, { type });
+      const response = await apiClient.patch(`/workers/${workerId}/type`, { type, absenceEndDate });
       set((state) => ({
         workers: state.workers.map((w) =>
           w.id === workerId ? response.data : w

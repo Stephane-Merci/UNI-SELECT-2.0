@@ -23,6 +23,7 @@ const workerSchema = z.object({
   type: z.nativeEnum(WorkerType),
   originalPostId: z.string().min(1),
   preRetraiteDay: z.enum(PRE_RETRAITE_DAYS).nullable().optional(),
+  absenceEndDate: z.string().nullable().optional(),
 });
 
 // Get all workers
@@ -114,7 +115,7 @@ router.put('/:id', async (req, res) => {
     const updateSchema = workerSchema.partial();
     const data = updateSchema.parse(req.body);
 
-    const { originalPostId, type, preRetraiteDay, ...rest } = data;
+    const { originalPostId, type, preRetraiteDay, absenceEndDate, ...rest } = data;
 
     const updateData: any = { ...rest };
 
@@ -126,7 +127,6 @@ router.put('/:id', async (req, res) => {
     }
 
     if (preRetraiteDay !== undefined) {
-      // Allow clearing pre-retirement by sending null
       if (preRetraiteDay === null) {
         updateData.preRetraiteDay = null;
       } else if ((PRE_RETRAITE_DAYS as readonly string[]).includes(preRetraiteDay)) {
@@ -134,6 +134,10 @@ router.put('/:id', async (req, res) => {
       } else {
         return res.status(400).json({ error: 'Invalid preRetraiteDay' });
       }
+    }
+
+    if (absenceEndDate !== undefined) {
+      updateData.absenceEndDate = absenceEndDate ? new Date(absenceEndDate) : null;
     }
 
     if (originalPostId) {
@@ -175,17 +179,22 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Update worker (origin) type — accepts any worker type for permanent default
+// Update worker (origin) type and optionally absenceEndDate
 router.patch('/:id/type', async (req, res) => {
   try {
-    const { type } = req.body;
+    const { type, absenceEndDate } = req.body;
     if (!Object.values(WorkerType).includes(type)) {
       return res.status(400).json({ error: 'Invalid worker type' });
     }
 
+    const data: any = { type };
+    if (absenceEndDate !== undefined) {
+      data.absenceEndDate = absenceEndDate ? new Date(absenceEndDate) : null;
+    }
+
     const worker = await prisma.worker.update({
       where: { id: req.params.id },
-      data: { type },
+      data,
       include: {
         originalPost: true,
       },

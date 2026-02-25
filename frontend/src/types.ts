@@ -88,6 +88,8 @@ export interface Worker {
   originalPost: Post;
   /** Weekly pre-retirement day (e.g. 'MONDAY'–'FRIDAY'), or null when not in pré-retraite. */
   preRetraiteDay?: string | null;
+  /** Final day of absence (e.g. vacation, sick leave). */
+  absenceEndDate?: string | null;
   assignments?: Assignment[];
   createdAt: string;
   updatedAt: string;

@@ -21,7 +21,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../store/useStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
-import { Worker, Post, WorkerType, WorkerTypeColors, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR } from '../types';
+import { Worker, Post, WorkerType, WorkerTypeLabels, WorkerTypeColors, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR, ORIGIN_TYPES } from '../types';
 import PostColumn, { POST_COLUMN_DRAG_PREFIX } from '../components/PostColumn';
 import WorkerCard, { getWorkerIdFromDragId, PRESENCE_DRAG_PREFIX } from '../components/WorkerCard';
 import PlanManagementModal from '../components/PlanManagementModal';
@@ -45,6 +45,7 @@ const ATTENDANCE_PRESENCE_GROUPS: Record<string, WorkerType[]> = {
   'Libération externe': [WorkerType.LIBERATION_EXTERNE],
   'Invalidité': [WorkerType.INVALIDITE],
   'Congé parental': [WorkerType.CONGE_PARENTAL],
+  'Préretraite': [WorkerType.PRERETRAITE],
 };
 const ATTENDANCE_PRESENCE_TYPES = new Set(Object.values(ATTENDANCE_PRESENCE_GROUPS).flat());
 
@@ -357,6 +358,7 @@ export default function PlanManagement() {
     planLayoutVersion,
     addUnfilledPosition,
     deleteUnfilledPosition,
+    updateWorkerType,
   } = useStore();
 
   // Ordered posts for current plan (persisted in localStorage); re-render when layout changes
@@ -419,6 +421,12 @@ export default function PlanManagement() {
   const [preRetraiteInfo, setPreRetraiteInfo] = useState<string[] | null>(null);
   const [preRetraiteAppliedPlanId, setPreRetraiteAppliedPlanId] = useState<string | null>(null);
 
+  const [returningWorkerPrompt, setReturningWorkerPrompt] = useState<{
+    worker: Worker;
+    newType: WorkerType;
+    newEndDate: string;
+  } | null>(null);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 2 },
@@ -442,8 +450,27 @@ export default function PlanManagement() {
   useEffect(() => {
     if (currentPlan) {
       fetchAssignments(currentPlan.id);
+
+      // Check for returning workers (whose absenceEndDate is <= current plan date)
+      const planDate = currentPlan.date ? new Date(currentPlan.date) : new Date();
+      planDate.setHours(0, 0, 0, 0);
+
+      const expWork = workers.find((w) => {
+        if (!w.absenceEndDate) return false;
+        const endDate = new Date(w.absenceEndDate);
+        endDate.setHours(0, 0, 0, 0);
+        return endDate <= planDate;
+      });
+
+      if (expWork && !returningWorkerPrompt) {
+        setReturningWorkerPrompt({
+          worker: expWork,
+          newType: ORIGIN_TYPES.includes(expWork.type) ? expWork.type : WorkerType.PERMANENT_JOUR,
+          newEndDate: '',
+        });
+      }
     }
-  }, [currentPlan, fetchAssignments]);
+  }, [currentPlan, fetchAssignments, workers, returningWorkerPrompt]);
 
   // Automatically apply PRERETRAITE presence based on weekly pré-retraite day when loading a plan.
   useEffect(() => {
@@ -1021,6 +1048,14 @@ export default function PlanManagement() {
             >
               Voir remplacements
             </Link>
+            {currentPlan && (
+              <Link
+                to={`/premium-state?planId=${currentPlan.id}`}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 shadow-sm"
+              >
+                État de Prime
+              </Link>
+            )}
             <button
               onClick={() => setShowPlanModal(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -1297,6 +1332,75 @@ export default function PlanManagement() {
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
                 Appliquer les sélections
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {returningWorkerPrompt && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+          <div className="bg-white rounded-lg shadow-2xl p-6 max-w-md w-full mx-4 border-t-4 border-indigo-600">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Retour d&apos;absence</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              L&apos;absence de <strong>{returningWorkerPrompt.worker.name}</strong> ({returningWorkerPrompt.worker.anciennete}) se termine aujourd&apos;hui.
+              Que souhaitez-vous faire ?
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                  Nouveau type ou Retour au poste
+                </label>
+                <select
+                  value={returningWorkerPrompt.newType}
+                  onChange={(e) => setReturningWorkerPrompt({ ...returningWorkerPrompt, newType: e.target.value as WorkerType })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                >
+                  {ORIGIN_TYPES.map((t: WorkerType) => (
+                    <option key={t} value={t}>{WorkerTypeLabels[t]}</option>
+                  ))}
+                  <option value={WorkerType.ABSENT}>Absent (Prolonger)</option>
+                  <option value={WorkerType.VACANCES}>Vacances (Prolonger)</option>
+                  <option value={WorkerType.INVALIDITE}>Invalidité (Prolonger)</option>
+                  <option value={WorkerType.LIBERATION_EXTERNE}>Libération externe (Prolonger)</option>
+                  <option value={WorkerType.CONGE_PARENTAL}>Congé parental (Prolonger)</option>
+                </select>
+              </div>
+
+              {[WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE, WorkerType.LIBERATION_EXTERNE, WorkerType.CONGE_PARENTAL].includes(returningWorkerPrompt.newType) && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                    Nouvelle date de fin
+                  </label>
+                  <input
+                    type="date"
+                    value={returningWorkerPrompt.newEndDate}
+                    onChange={(e) => setReturningWorkerPrompt({ ...returningWorkerPrompt, newEndDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    min={currentPlan?.date ? new Date(currentPlan.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                onClick={async () => {
+                  const isAbsence = [WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE, WorkerType.LIBERATION_EXTERNE, WorkerType.CONGE_PARENTAL].includes(returningWorkerPrompt.newType);
+                  const endDate = isAbsence ? returningWorkerPrompt.newEndDate : null;
+
+                  if (isAbsence && !endDate) return; // Require date for extension
+
+                  await updateWorkerType(returningWorkerPrompt.worker.id, returningWorkerPrompt.newType, endDate);
+                  if (currentPlan) {
+                    await updateWorkerPresence(currentPlan.id, returningWorkerPrompt.worker.id, returningWorkerPrompt.newType);
+                  }
+                  setReturningWorkerPrompt(null);
+                }}
+                className="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-md"
+              >
+                Confirmer
               </button>
             </div>
           </div>

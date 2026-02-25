@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import { useAuthStore } from './store/useAuthStore';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import PremiumState from './pages/PremiumState';
 
 function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
@@ -63,6 +64,12 @@ function App() {
           element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
         >
           <Route index element={<Documentation />} />
+        </Route>
+        <Route
+          path="/premium-state"
+          element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
+        >
+          <Route index element={<PremiumState />} />
         </Route>
         <Route
           path="/admin"

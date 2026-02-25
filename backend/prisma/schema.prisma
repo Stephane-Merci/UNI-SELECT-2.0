@@ -19,6 +19,7 @@ model Worker {
   preRetraiteDay       String?
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
+  absenceEndDate       DateTime?
   assignments          Assignment[]
   bookingAssignments   BookingAssignment[]
   bookingReplacements1 BookingReplacement[] @relation("Replacement1")
