@@ -21,7 +21,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../store/useStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
-import { Worker, Post, WorkerType, WorkerTypeColors, ORIGIN_TYPES, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR } from '../types';
+import { Worker, Post, WorkerType, WorkerTypeColors, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR } from '../types';
 import PostColumn, { POST_COLUMN_DRAG_PREFIX } from '../components/PostColumn';
 import WorkerCard, { getWorkerIdFromDragId, PRESENCE_DRAG_PREFIX } from '../components/WorkerCard';
 import PlanManagementModal from '../components/PlanManagementModal';
@@ -44,7 +44,6 @@ const ATTENDANCE_PRESENCE_GROUPS: Record<string, WorkerType[]> = {
   'Vacances': [WorkerType.VACANCES],
   'Libération externe': [WorkerType.LIBERATION_EXTERNE],
   'Invalidité': [WorkerType.INVALIDITE],
-  'Préretraite': [WorkerType.PRERETRAITE],
   'Congé parental': [WorkerType.CONGE_PARENTAL],
 };
 const ATTENDANCE_PRESENCE_TYPES = new Set(Object.values(ATTENDANCE_PRESENCE_GROUPS).flat());
@@ -351,7 +350,6 @@ export default function PlanManagement() {
     assignWorker,
     removeAssignment,
     updateWorkerPresence,
-    updateWorkerType,
     getPlanPostOrder,
     setPlanPostOrder,
     getPlanLockedPosts,
@@ -383,7 +381,16 @@ export default function PlanManagement() {
     workerName: string;
     workerAnciennete: string;
     shift: 'jour' | 'soir';
-    options: { id: string; name: string; anciennete: string }[];
+    options: {
+      id: string;
+      name: string;
+      anciennete: string;
+      isAbsentZone?: boolean;
+      isPreRetraiteToday?: boolean;
+      assignedElsewhere?: boolean;
+      leavesReplacementPost?: boolean;
+      assignedPostName?: string | null;
+    }[];
   } | null>(null);
   const [replacementPromptSelectedId, setReplacementPromptSelectedId] = useState<string | null>(null);
   const [autoAssignReplacementPrompt, setAutoAssignReplacementPrompt] = useState<{
@@ -391,7 +398,16 @@ export default function PlanManagement() {
       postId: string;
       postName: string;
       shift: 'jour' | 'soir';
-      options: { id: string; name: string; anciennete: string }[];
+      options: {
+        id: string;
+        name: string;
+        anciennete: string;
+        isAbsentZone?: boolean;
+        isPreRetraiteToday?: boolean;
+        assignedElsewhere?: boolean;
+        leavesReplacementPost?: boolean;
+        assignedPostName?: string | null;
+      }[];
       selectedId: string | null;
     }[];
   } | null>(null);
@@ -547,6 +563,118 @@ export default function PlanManagement() {
     setActiveWorker(worker);
   };
 
+  const checkAndPromptReplacement = async (worker: Worker, previousPostId: string, movedWorkerId: string) => {
+    const workerShift: 'jour' | 'soir' | null = WORKER_TYPES_JOUR.includes(worker.type)
+      ? 'jour'
+      : WORKER_TYPES_SOIR.includes(worker.type)
+        ? 'soir'
+        : null;
+    if (!workerShift) return;
+
+    // Use status from store to avoid stale closure in handleDragEnd
+    const currentAssignments = useStore.getState().assignments.filter(a => a.planId === currentPlan?.id);
+    const currentAssignmentMap: Record<string, string> = {};
+    currentAssignments.forEach(a => { currentAssignmentMap[a.workerId] = a.postId; });
+
+    const workersStillOnPost = workers.filter(
+      (w) => w.id !== movedWorkerId && currentAssignmentMap[w.id] === previousPostId
+    );
+    const activeSameShiftStillOnPost = workersStillOnPost.filter((w) => {
+      const presence = presenceMap[w.id] || w.type;
+      const isActive = !ATTENDANCE_PRESENCE_TYPES.has(presence);
+      return isActive && (
+        workerShift === 'jour'
+          ? WORKER_TYPES_JOUR.includes(w.type)
+          : WORKER_TYPES_SOIR.includes(w.type)
+      );
+    });
+
+    if (activeSameShiftStillOnPost.length === 0) {
+      try {
+        const bookingsRes = await apiClient.get<Booking[]>('/bookings');
+        const bookingsList = bookingsRes.data ?? [];
+        const planDate = currentPlan?.date ? new Date(currentPlan.date).getTime() : null;
+        const chosenBooking =
+          planDate != null
+            ? bookingsList.find((b) => new Date(b.effectiveDate).getTime() === planDate) ?? bookingsList[0]
+            : bookingsList[0];
+        if (chosenBooking) {
+          const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
+          const replList = replRes.data ?? [];
+          const row = replList.find((r) => r.postId === previousPostId);
+          if (row) {
+            const ids =
+              workerShift === 'jour'
+                ? [row.replacement1WorkerId, row.replacement2WorkerId, row.replacement3WorkerId, row.replacement4WorkerId]
+                : [row.replacement5WorkerId, row.replacement6WorkerId, row.replacement7WorkerId, row.replacement8WorkerId];
+            const optionIds = (ids.filter((id): id is string => !!id) as string[]).filter(Boolean);
+
+            const planDateStr = currentPlan?.date ? new Date(currentPlan.date).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : '';
+
+            const options = optionIds
+              .map((id) => {
+                const w = workers.find((work) => work.id === id);
+                if (!w) return null;
+
+                const presence = presenceMap[w.id] || w.type;
+                const isAbsentZone = [
+                  WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE,
+                  WorkerType.PRERETRAITE, WorkerType.CONGE_PARENTAL, WorkerType.LIBERATION_EXTERNE
+                ].includes(presence);
+
+                const isPreRetraiteToday = w.preRetraiteDay === planDateStr;
+                const assignedPostId = currentAssignmentMap[w.id];
+
+                let leavesReplacementPost = false;
+                if (assignedPostId) {
+                  const wShift: 'jour' | 'soir' | null = WORKER_TYPES_JOUR.includes(w.type) ? 'jour' : WORKER_TYPES_SOIR.includes(w.type) ? 'soir' : null;
+                  if (wShift) {
+                    const othersOnPost = workers.filter(other => other.id !== w.id && currentAssignmentMap[other.id] === assignedPostId);
+                    const activeShiftOthers = othersOnPost.filter(o => {
+                      const p = presenceMap[o.id] || o.type;
+                      return !ATTENDANCE_PRESENCE_TYPES.has(p) && (wShift === 'jour' ? WORKER_TYPES_JOUR.includes(o.type) : WORKER_TYPES_SOIR.includes(o.type));
+                    });
+                    if (activeShiftOthers.length === 0) {
+                      leavesReplacementPost = replList.some(r => r.postId === assignedPostId && (wShift === 'jour' ? !!(r.replacement1WorkerId || r.replacement2WorkerId || r.replacement3WorkerId || r.replacement4WorkerId) : !!(r.replacement5WorkerId || r.replacement6WorkerId || r.replacement7WorkerId || r.replacement8WorkerId)));
+                    }
+                  }
+                }
+
+                const assignedElsewhere = !!assignedPostId && assignedPostId !== previousPostId;
+
+                return {
+                  id: w.id,
+                  name: w.name,
+                  anciennete: w.anciennete,
+                  isAbsentZone,
+                  isPreRetraiteToday,
+                  assignedElsewhere,
+                  leavesReplacementPost,
+                  assignedPostName: assignedElsewhere ? posts.find(p => p.id === assignedPostId)?.name : null
+                };
+              })
+              .filter((opt): opt is NonNullable<typeof opt> => !!opt);
+
+            if (options.length > 0) {
+              const post = posts.find((p) => p.id === previousPostId);
+              setReplacementPrompt({
+                postId: previousPostId,
+                postName: post?.name ?? previousPostId,
+                workerName: worker.name,
+                workerAnciennete: worker.anciennete,
+                shift: workerShift,
+                options,
+              });
+              setReplacementPromptSelectedId(options.find(o => !o.assignedElsewhere && !o.isAbsentZone && !o.isPreRetraiteToday && !o.leavesReplacementPost)?.id ?? options[0]?.id ?? null);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Replacement check failed:', e);
+      }
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveWorker(null);
@@ -582,7 +710,6 @@ export default function PlanManagement() {
     const worker = workers.find((w) => w.id === workerId);
     const previousPresenceType = presenceMap[workerId] ?? worker?.type ?? ('' as WorkerType);
     const previousPostId = assignmentMap[workerId] ?? null;
-
     // Check if dropping on a presence type box (fiche de présence): unassign from post and update presence
     if (overId.startsWith('presence-')) {
       setLastPlanAction({ workerId, previousPostId, previousPresenceType });
@@ -598,75 +725,13 @@ export default function PlanManagement() {
       if (Object.values(WorkerType).includes(droppedType)) {
         const currentPresenceType = presenceMap[workerId] ?? worker?.type;
         if (currentPresenceType !== droppedType) {
-          const isOriginType = ORIGIN_TYPES.includes(droppedType);
-          if (isOriginType) {
-            void updateWorkerType(workerId, droppedType);
-            void updateWorkerPresence(currentPlan.id, workerId, droppedType);
-          } else {
-            void updateWorkerPresence(currentPlan.id, workerId, droppedType);
-          }
+          void updateWorkerPresence(currentPlan.id, workerId, droppedType);
         }
       }
 
       // Crucial check: if this worker was the only one from their shift on their post, and the post has replacements, prompt to choose a replacement
       if (previousPostId && worker) {
-        const workerShift: 'jour' | 'soir' | null = WORKER_TYPES_JOUR.includes(worker.type)
-          ? 'jour'
-          : WORKER_TYPES_SOIR.includes(worker.type)
-            ? 'soir'
-            : null;
-        if (workerShift) {
-          const workersStillOnPost = workers.filter(
-            (w) => w.id !== workerId && assignmentMap[w.id] === previousPostId
-          );
-          const sameShiftStillOnPost = workersStillOnPost.filter((w) =>
-            workerShift === 'jour'
-              ? WORKER_TYPES_JOUR.includes(w.type)
-              : WORKER_TYPES_SOIR.includes(w.type)
-          );
-          if (sameShiftStillOnPost.length === 0) {
-            try {
-              const bookingsRes = await apiClient.get<Booking[]>('/bookings');
-              const bookingsList = bookingsRes.data ?? [];
-              const planDate = currentPlan.date ? new Date(currentPlan.date).getTime() : null;
-              const chosenBooking =
-                planDate != null
-                  ? bookingsList.find((b) => new Date(b.effectiveDate).getTime() === planDate) ?? bookingsList[0]
-                  : bookingsList[0];
-              if (chosenBooking) {
-                const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
-                const replList = replRes.data ?? [];
-                const row = replList.find((r) => r.postId === previousPostId);
-                if (row) {
-                  const ids =
-                    workerShift === 'jour'
-                      ? [row.replacement1WorkerId, row.replacement2WorkerId]
-                      : [row.replacement3WorkerId, row.replacement4WorkerId];
-                  const optionIds = (ids.filter((id): id is string => !!id) as string[]).filter(Boolean);
-                  const options = optionIds
-                    .map((id) => workers.find((w) => w.id === id))
-                    .filter((w): w is Worker => !!w)
-                    .map((w) => ({ id: w.id, name: w.name, anciennete: w.anciennete }));
-                  if (options.length > 0) {
-                    const post = posts.find((p) => p.id === previousPostId);
-                    setReplacementPrompt({
-                      postId: previousPostId,
-                      postName: post?.name ?? previousPostId,
-                      workerName: worker.name,
-                      workerAnciennete: worker.anciennete,
-                      shift: workerShift,
-                      options,
-                    });
-                    setReplacementPromptSelectedId(options[0]?.id ?? null);
-                    return;
-                  }
-                }
-              }
-            } catch (e) {
-              console.error('Replacement check failed:', e);
-            }
-          }
-        }
+        await checkAndPromptReplacement(worker, previousPostId, workerId);
       }
       return;
     }
@@ -683,6 +748,11 @@ export default function PlanManagement() {
         void updateWorkerPresence(currentPlan.id, workerId, worker.type);
       }
       void assignWorker(currentPlan.id, workerId, post.id);
+
+      // Trigger replacement check for the SOURCE post if it's now empty
+      if (previousPostId && worker) {
+        await checkAndPromptReplacement(worker, previousPostId, workerId);
+      }
       return;
     }
   };
@@ -797,44 +867,114 @@ export default function PlanManagement() {
         const items: any[] = [];
         for (const r of replList) {
           const postId = r.postId;
-          const workersOnPost = workers.filter((w) => w.originalPostId === postId);
+          const workersOnPost = workers.filter((w) => assignmentMap[w.id] === postId);
           const postName = posts.find((p) => p.id === postId)?.name ?? postId;
+
+          const planDateStr = currentPlan.date ? new Date(currentPlan.date).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : '';
 
           // Check Jour shift
           const jourWorkers = workersOnPost.filter((w) => WORKER_TYPES_JOUR.includes(w.type));
-          const allJourAbsent =
-            jourWorkers.length > 0 &&
-            jourWorkers.every((w) => {
-              const pt = presenceMap[w.id] ?? w.type;
-              return ATTENDANCE_PRESENCE_TYPES.has(pt);
-            });
-          if (allJourAbsent) {
-            const workerIds = [r.replacement1WorkerId, r.replacement2WorkerId].filter((id): id is string => !!id);
+          const activeJourWorkers = jourWorkers.filter((w) => {
+            const pt = presenceMap[w.id] ?? w.type;
+            return !ATTENDANCE_PRESENCE_TYPES.has(pt);
+          });
+
+          if (activeJourWorkers.length === 0) {
+            const workerIds = [r.replacement1WorkerId, r.replacement2WorkerId, r.replacement3WorkerId, r.replacement4WorkerId].filter((id): id is string => !!id);
             const options = workerIds
-              .map((id) => workers.find((w) => w.id === id))
-              .filter((w): w is Worker => !!w)
-              .map((w) => ({ id: w.id, name: w.name, anciennete: w.anciennete }));
+              .map((id) => {
+                const w = workers.find((work) => work.id === id);
+                if (!w) return null;
+                const presence = presenceMap[w.id] || w.type;
+                const isAbsentZone = [
+                  WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE,
+                  WorkerType.PRERETRAITE, WorkerType.CONGE_PARENTAL, WorkerType.LIBERATION_EXTERNE
+                ].includes(presence);
+                const isPreRetraiteToday = w.preRetraiteDay === planDateStr;
+                const assignedPostId = assignmentMap[w.id];
+                const assignedElsewhere = !!assignedPostId;
+
+                let leavesReplacementPost = false;
+                if (assignedPostId) {
+                  const othersOnPost = workers.filter(other => other.id !== w.id && assignmentMap[other.id] === assignedPostId);
+                  const activeShiftOthers = othersOnPost.filter(o => {
+                    const p = presenceMap[o.id] || o.type;
+                    return !ATTENDANCE_PRESENCE_TYPES.has(p) && WORKER_TYPES_JOUR.includes(o.type);
+                  });
+                  if (activeShiftOthers.length === 0) {
+                    leavesReplacementPost = replList.some(r => r.postId === assignedPostId && !!(r.replacement1WorkerId || r.replacement2WorkerId || r.replacement3WorkerId || r.replacement4WorkerId));
+                  }
+                }
+
+                return {
+                  id: w.id, name: w.name, anciennete: w.anciennete,
+                  isAbsentZone, isPreRetraiteToday, assignedElsewhere, leavesReplacementPost,
+                  assignedPostName: assignedElsewhere ? posts.find(p => p.id === assignedPostId)?.name : null
+                };
+              })
+              .filter((opt): opt is NonNullable<typeof opt> => !!opt);
+
             if (options.length > 0) {
-              items.push({ postId, postName, shift: 'jour', options, selectedId: options[0].id });
+              items.push({
+                postId,
+                postName,
+                shift: 'jour',
+                options,
+                selectedId: options.find(o => !o.assignedElsewhere && !o.isAbsentZone && !o.isPreRetraiteToday && !o.leavesReplacementPost)?.id ?? options[0].id
+              });
             }
           }
 
           // Check Soir shift
           const soirWorkers = workersOnPost.filter((w) => WORKER_TYPES_SOIR.includes(w.type));
-          const allSoirAbsent =
-            soirWorkers.length > 0 &&
-            soirWorkers.every((w) => {
-              const pt = presenceMap[w.id] ?? w.type;
-              return ATTENDANCE_PRESENCE_TYPES.has(pt);
-            });
-          if (allSoirAbsent) {
-            const workerIds = [r.replacement3WorkerId, r.replacement4WorkerId].filter((id): id is string => !!id);
+          const activeSoirWorkers = soirWorkers.filter((w) => {
+            const pt = presenceMap[w.id] ?? w.type;
+            return !ATTENDANCE_PRESENCE_TYPES.has(pt);
+          });
+
+          if (activeSoirWorkers.length === 0) {
+            const workerIds = [r.replacement5WorkerId, r.replacement6WorkerId, r.replacement7WorkerId, r.replacement8WorkerId].filter((id): id is string => !!id);
             const options = workerIds
-              .map((id) => workers.find((w) => w.id === id))
-              .filter((w): w is Worker => !!w)
-              .map((w) => ({ id: w.id, name: w.name, anciennete: w.anciennete }));
+              .map((id) => {
+                const w = workers.find((work) => work.id === id);
+                if (!w) return null;
+                const presence = presenceMap[w.id] || w.type;
+                const isAbsentZone = [
+                  WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE,
+                  WorkerType.PRERETRAITE, WorkerType.CONGE_PARENTAL, WorkerType.LIBERATION_EXTERNE
+                ].includes(presence);
+                const isPreRetraiteToday = w.preRetraiteDay === planDateStr;
+                const assignedPostId = assignmentMap[w.id];
+                const assignedElsewhere = !!assignedPostId;
+
+                let leavesReplacementPost = false;
+                if (assignedPostId) {
+                  const othersOnPost = workers.filter(other => other.id !== w.id && assignmentMap[other.id] === assignedPostId);
+                  const activeShiftOthers = othersOnPost.filter(o => {
+                    const p = presenceMap[o.id] || o.type;
+                    return !ATTENDANCE_PRESENCE_TYPES.has(p) && WORKER_TYPES_SOIR.includes(o.type);
+                  });
+                  if (activeShiftOthers.length === 0) {
+                    leavesReplacementPost = replList.some(r => r.postId === assignedPostId && !!(r.replacement5WorkerId || r.replacement6WorkerId || r.replacement7WorkerId || r.replacement8WorkerId));
+                  }
+                }
+
+                return {
+                  id: w.id, name: w.name, anciennete: w.anciennete,
+                  isAbsentZone, isPreRetraiteToday, assignedElsewhere, leavesReplacementPost,
+                  assignedPostName: assignedElsewhere ? posts.find(p => p.id === assignedPostId)?.name : null
+                };
+              })
+              .filter((opt): opt is NonNullable<typeof opt> => !!opt);
+
             if (options.length > 0) {
-              items.push({ postId, postName, shift: 'soir', options, selectedId: options[0].id });
+              items.push({
+                postId,
+                postName,
+                shift: 'soir',
+                options,
+                selectedId: options.find(o => !o.assignedElsewhere && !o.isAbsentZone && !o.isPreRetraiteToday && !o.leavesReplacementPost)?.id ?? options[0].id
+              });
             }
           }
         }
@@ -925,8 +1065,8 @@ export default function PlanManagement() {
                 type="button"
                 onClick={() => setIsResizeLocked(!isResizeLocked)}
                 className={`p-1.5 rounded-full shadow-sm border transition-all z-10 ${isResizeLocked
-                    ? 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'
-                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                  ? 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'
+                  : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                   }`}
                 title={isResizeLocked ? "Déverrouiller le redimensionnement" : "Verrouiller le redimensionnement"}
               >
@@ -943,8 +1083,8 @@ export default function PlanManagement() {
               <div
                 onMouseDown={handleMouseDown}
                 className={`w-1 flex-1 bg-gray-300 transition-colors ${isResizeLocked
-                    ? 'cursor-not-allowed opacity-50'
-                    : 'hover:bg-blue-500 cursor-col-resize'
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'hover:bg-blue-500 cursor-col-resize'
                   } ${isResizing ? 'bg-blue-500' : ''}`}
                 style={{ minWidth: '4px' }}
               />
@@ -1024,11 +1164,22 @@ export default function PlanManagement() {
               onChange={(e) => setReplacementPromptSelectedId(e.target.value || null)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-4"
             >
-              {replacementPrompt.options.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  ({opt.anciennete}) {opt.name}
-                </option>
-              ))}
+              <option value="">-- Ne pas assigner --</option>
+              {replacementPrompt.options.map((opt) => {
+                const isWarning = opt.leavesReplacementPost || opt.isPreRetraiteToday;
+                return (
+                  <option
+                    key={opt.id}
+                    value={opt.id}
+                    disabled={opt.isAbsentZone}
+                    className={opt.isAbsentZone ? 'text-gray-400 italic' : isWarning ? 'text-amber-600' : ''}
+                  >
+                    {opt.isAbsentZone ? '🚫 ' : isWarning ? '⚠️ ' : ''}
+                    ({opt.anciennete}) {opt.name}
+                    {opt.isAbsentZone ? ' (Absent/Vacances)' : opt.leavesReplacementPost ? ` (Laissera ${opt.assignedPostName} vide)` : opt.isPreRetraiteToday ? ' (Pré-retraite)' : opt.assignedElsewhere ? ` (Sur ${opt.assignedPostName})` : ''}
+                  </option>
+                );
+              })}
             </select>
             <div className="flex justify-end gap-2">
               <button
@@ -1036,21 +1187,37 @@ export default function PlanManagement() {
                 onClick={() => { setReplacementPrompt(null); setReplacementPromptSelectedId(null); }}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
-                Ne pas affecter
+                Ignorer
               </button>
               <button
                 type="button"
                 onClick={async () => {
-                  if (replacementPromptSelectedId) {
-                    await assignWorker(currentPlan.id, replacementPromptSelectedId, replacementPrompt.postId);
+                  if (replacementPromptSelectedId && currentPlan && replacementPrompt) {
+                    const chosenId = replacementPromptSelectedId;
+                    const targetPostId = replacementPrompt.postId;
+                    const chosenWorker = workers.find(w => w.id === chosenId);
+                    const currentAssignments = useStore.getState().assignments.filter(a => a.planId === currentPlan?.id);
+                    const previousPostIdForChosen = currentAssignments.find(a => a.workerId === chosenId)?.postId;
+
+                    // Clear BEFORE potentially setting a new one
+                    setReplacementPrompt(null);
+                    setReplacementPromptSelectedId(null);
+
+                    await assignWorker(currentPlan.id, chosenId, targetPostId);
                     await fetchAssignments(currentPlan.id);
+
+                    // If the chosen replacement was already on another post, trigger a replacement prompt for THAT post
+                    if (chosenWorker && previousPostIdForChosen) {
+                      await checkAndPromptReplacement(chosenWorker, previousPostIdForChosen, chosenId);
+                    }
+                  } else {
+                    setReplacementPrompt(null);
+                    setReplacementPromptSelectedId(null);
                   }
-                  setReplacementPrompt(null);
-                  setReplacementPromptSelectedId(null);
                 }}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
               >
-                Affecter le remplaçant
+                Affecter
               </button>
             </div>
           </div>
@@ -1089,11 +1256,21 @@ export default function PlanManagement() {
                     className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm cursor-pointer hover:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     <option value="">-- Ne pas assigner --</option>
-                    {item.options.map(opt => (
-                      <option key={opt.id} value={opt.id}>
-                        ({opt.anciennete}) {opt.name}
-                      </option>
-                    ))}
+                    {item.options.map(opt => {
+                      const isWarning = opt.leavesReplacementPost || opt.isPreRetraiteToday;
+                      return (
+                        <option
+                          key={opt.id}
+                          value={opt.id}
+                          disabled={opt.isAbsentZone}
+                          className={opt.isAbsentZone ? 'text-gray-400 italic' : isWarning ? 'text-amber-600' : ''}
+                        >
+                          {opt.isAbsentZone ? '🚫 ' : isWarning ? '⚠️ ' : ''}
+                          ({opt.anciennete}) {opt.name}
+                          {opt.isAbsentZone ? ' (Absent/Vacances)' : opt.leavesReplacementPost ? ` (Laissera ${opt.assignedPostName} vide)` : opt.isPreRetraiteToday ? ' (Pré-retraite)' : opt.assignedElsewhere ? ` (Sur ${opt.assignedPostName})` : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               ))}

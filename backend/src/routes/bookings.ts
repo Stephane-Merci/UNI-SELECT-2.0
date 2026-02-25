@@ -54,6 +54,10 @@ const putReplacementsSchema = z.object({
     replacement2WorkerId: z.string().nullable().optional(),
     replacement3WorkerId: z.string().nullable().optional(),
     replacement4WorkerId: z.string().nullable().optional(),
+    replacement5WorkerId: z.string().nullable().optional(),
+    replacement6WorkerId: z.string().nullable().optional(),
+    replacement7WorkerId: z.string().nullable().optional(),
+    replacement8WorkerId: z.string().nullable().optional(),
   })),
 });
 
@@ -68,6 +72,10 @@ router.get('/:id/replacements', async (req, res) => {
         replacement2Worker: true,
         replacement3Worker: true,
         replacement4Worker: true,
+        replacement5Worker: true,
+        replacement6Worker: true,
+        replacement7Worker: true,
+        replacement8Worker: true,
       },
     });
     res.json(list);
@@ -102,6 +110,10 @@ router.put('/:id/replacements', async (req, res) => {
           replacement2WorkerId: toWorkerId(r.replacement2WorkerId ?? undefined),
           replacement3WorkerId: toWorkerId(r.replacement3WorkerId ?? undefined),
           replacement4WorkerId: toWorkerId(r.replacement4WorkerId ?? undefined),
+          replacement5WorkerId: toWorkerId(r.replacement5WorkerId ?? undefined),
+          replacement6WorkerId: toWorkerId(r.replacement6WorkerId ?? undefined),
+          replacement7WorkerId: toWorkerId(r.replacement7WorkerId ?? undefined),
+          replacement8WorkerId: toWorkerId(r.replacement8WorkerId ?? undefined),
         })),
       });
     }
@@ -113,6 +125,10 @@ router.put('/:id/replacements', async (req, res) => {
         replacement2Worker: true,
         replacement3Worker: true,
         replacement4Worker: true,
+        replacement5Worker: true,
+        replacement6Worker: true,
+        replacement7Worker: true,
+        replacement8Worker: true,
       },
     });
     res.json(list);

@@ -160,6 +160,7 @@ export interface Booking {
   updatedAt: string;
   isActive: boolean;
   assignments: BookingAssignment[];
+  replacements: BookingReplacement[];
 }
 
 export interface BookingReplacement {
@@ -175,4 +176,12 @@ export interface BookingReplacement {
   replacement3Worker?: Worker | null;
   replacement4WorkerId: string | null;
   replacement4Worker?: Worker | null;
+  replacement5WorkerId: string | null;
+  replacement5Worker?: Worker | null;
+  replacement6WorkerId: string | null;
+  replacement6Worker?: Worker | null;
+  replacement7WorkerId: string | null;
+  replacement7Worker?: Worker | null;
+  replacement8WorkerId: string | null;
+  replacement8Worker?: Worker | null;
 }

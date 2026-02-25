@@ -25,6 +25,10 @@ model Worker {
   bookingReplacements2 BookingReplacement[] @relation("Replacement2")
   bookingReplacements3 BookingReplacement[] @relation("Replacement3")
   bookingReplacements4 BookingReplacement[] @relation("Replacement4")
+  bookingReplacements5 BookingReplacement[] @relation("Replacement5")
+  bookingReplacements6 BookingReplacement[] @relation("Replacement6")
+  bookingReplacements7 BookingReplacement[] @relation("Replacement7")
+  bookingReplacements8 BookingReplacement[] @relation("Replacement8")
   originalPost         Post                 @relation("OriginalPost", fields: [originalPostId], references: [id])
   presences            WorkerPresence[]
 
@@ -141,12 +145,20 @@ model BookingReplacement {
   replacement2WorkerId String?
   replacement3WorkerId String?
   replacement4WorkerId String?
+  replacement5WorkerId String?
+  replacement6WorkerId String?
+  replacement7WorkerId String?
+  replacement8WorkerId String?
   booking              Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   post                 Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
   replacement1Worker   Worker? @relation("Replacement1", fields: [replacement1WorkerId], references: [id])
   replacement2Worker   Worker? @relation("Replacement2", fields: [replacement2WorkerId], references: [id])
   replacement3Worker   Worker? @relation("Replacement3", fields: [replacement3WorkerId], references: [id])
   replacement4Worker   Worker? @relation("Replacement4", fields: [replacement4WorkerId], references: [id])
+  replacement5Worker   Worker? @relation("Replacement5", fields: [replacement5WorkerId], references: [id])
+  replacement6Worker   Worker? @relation("Replacement6", fields: [replacement6WorkerId], references: [id])
+  replacement7Worker   Worker? @relation("Replacement7", fields: [replacement7WorkerId], references: [id])
+  replacement8Worker   Worker? @relation("Replacement8", fields: [replacement8WorkerId], references: [id])
 
   @@unique([bookingId, postId])
   @@index([bookingId])

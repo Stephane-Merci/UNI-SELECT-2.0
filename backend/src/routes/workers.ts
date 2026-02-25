@@ -20,7 +20,7 @@ const ORIGIN_TYPES: WorkerType[] = [
 const workerSchema = z.object({
   anciennete: z.string().min(1),
   name: z.string().min(1),
-  type: z.enum(ORIGIN_TYPES as unknown as [string, ...string[]]),
+  type: z.nativeEnum(WorkerType),
   originalPostId: z.string().min(1),
   preRetraiteDay: z.enum(PRE_RETRAITE_DAYS).nullable().optional(),
 });
@@ -175,12 +175,12 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Update worker (origin) type — only accepts one of the 6 origin types
+// Update worker (origin) type — accepts any worker type for permanent default
 router.patch('/:id/type', async (req, res) => {
   try {
     const { type } = req.body;
-    if (!ORIGIN_TYPES.includes(type)) {
-      return res.status(400).json({ error: 'Worker type must be one of the 6 origin types' });
+    if (!Object.values(WorkerType).includes(type)) {
+      return res.status(400).json({ error: 'Invalid worker type' });
     }
 
     const worker = await prisma.worker.update({
@@ -190,6 +190,8 @@ router.patch('/:id/type', async (req, res) => {
         originalPost: true,
       },
     });
+
+    io.emit('worker-type-changed', { worker, room: 'main' });
     res.json(worker);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update worker type' });

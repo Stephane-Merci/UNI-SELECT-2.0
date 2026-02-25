@@ -27,12 +27,19 @@ import { Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import apiClient from '../api/client';
 
-type ReplacementSlot = { r1: string | null; r2: string | null; r3: string | null; r4: string | null };
+type ReplacementSlot = {
+  r1: string | null; r2: string | null; r3: string | null; r4: string | null;
+  r5: string | null; r6: string | null; r7: string | null; r8: string | null;
+};
 const REPLACEMENT_LABELS: [keyof ReplacementSlot, string][] = [
-  ['r1', 'Remplaçant du jour 1'],
-  ['r2', 'Remplaçant du jour 2'],
-  ['r3', 'Remplaçant du soir 1'],
-  ['r4', 'Remplaçant du soir 2'],
+  ['r1', 'Remplaçant Jour 1'],
+  ['r2', 'Remplaçant Jour 2'],
+  ['r3', 'Remplaçant Jour 3'],
+  ['r4', 'Remplaçant Jour 4'],
+  ['r5', 'Remplaçant Soir 1'],
+  ['r6', 'Remplaçant Soir 2'],
+  ['r7', 'Remplaçant Soir 3'],
+  ['r8', 'Remplaçant Soir 4'],
 ];
 
 const UNASSIGNED_ZONE = 'unassigned';
@@ -242,6 +249,10 @@ export default function WorkAllocation() {
             r2: r.replacement2WorkerId ?? null,
             r3: r.replacement3WorkerId ?? null,
             r4: r.replacement4WorkerId ?? null,
+            r5: r.replacement5WorkerId ?? null,
+            r6: r.replacement6WorkerId ?? null,
+            r7: r.replacement7WorkerId ?? null,
+            r8: r.replacement8WorkerId ?? null,
           };
         });
         if (!cancelled) setReplacementByPostId(byPost);
@@ -432,6 +443,10 @@ export default function WorkAllocation() {
           replacement2WorkerId: slot.r2 || null,
           replacement3WorkerId: slot.r3 || null,
           replacement4WorkerId: slot.r4 || null,
+          replacement5WorkerId: slot.r5 || null,
+          replacement6WorkerId: slot.r6 || null,
+          replacement7WorkerId: slot.r7 || null,
+          replacement8WorkerId: slot.r8 || null,
         }));
         await apiClient.put(`/bookings/${editingBookingId}/replacements`, { replacements });
         setEditingBookingId(null);
@@ -449,6 +464,10 @@ export default function WorkAllocation() {
             replacement2WorkerId: slot.r2 || null,
             replacement3WorkerId: slot.r3 || null,
             replacement4WorkerId: slot.r4 || null,
+            replacement5WorkerId: slot.r5 || null,
+            replacement6WorkerId: slot.r6 || null,
+            replacement7WorkerId: slot.r7 || null,
+            replacement8WorkerId: slot.r8 || null,
           }));
           await apiClient.put(`/bookings/${newBookingId}/replacements`, { replacements });
         }
@@ -475,6 +494,10 @@ export default function WorkAllocation() {
         replacement2WorkerId: slot.r2 || null,
         replacement3WorkerId: slot.r3 || null,
         replacement4WorkerId: slot.r4 || null,
+        replacement5WorkerId: slot.r5 || null,
+        replacement6WorkerId: slot.r6 || null,
+        replacement7WorkerId: slot.r7 || null,
+        replacement8WorkerId: slot.r8 || null,
       }));
       await apiClient.put(`/bookings/${selectedBookingId}/replacements`, { replacements });
       await fetchBookings();
@@ -589,7 +612,7 @@ export default function WorkAllocation() {
       : new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     const replacementEntries = Object.entries(replacementByPostId).filter(
-      ([, slot]) => slot.r1 || slot.r2 || slot.r3 || slot.r4
+      ([, slot]) => slot.r1 || slot.r2 || slot.r3 || slot.r4 || slot.r5 || slot.r6 || slot.r7 || slot.r8
     );
     const replacementRows = replacementEntries
       .map(([postId, slot]) => {
@@ -598,8 +621,13 @@ export default function WorkAllocation() {
         const w2 = slot.r2 ? workers.find((w) => w.id === slot.r2) : null;
         const w3 = slot.r3 ? workers.find((w) => w.id === slot.r3) : null;
         const w4 = slot.r4 ? workers.find((w) => w.id === slot.r4) : null;
+        const w5 = slot.r5 ? workers.find((w) => w.id === slot.r5) : null;
+        const w6 = slot.r6 ? workers.find((w) => w.id === slot.r6) : null;
+        const w7 = slot.r7 ? workers.find((w) => w.id === slot.r7) : null;
+        const w8 = slot.r8 ? workers.find((w) => w.id === slot.r8) : null;
+
         const fmt = (w: { anciennete: string; name: string } | null | undefined) => (w ? `(${w.anciennete}) ${w.name}` : '—');
-        return `<tr><td class="print-repl-post">${post?.name ?? postId}</td><td>${fmt(w1)}</td><td>${fmt(w2)}</td><td>${fmt(w3)}</td><td>${fmt(w4)}</td></tr>`;
+        return `<tr><td class="print-repl-post">${post?.name ?? postId}</td><td>${fmt(w1)}</td><td>${fmt(w2)}</td><td>${fmt(w3)}</td><td>${fmt(w4)}</td><td>${fmt(w5)}</td><td>${fmt(w6)}</td><td>${fmt(w7)}</td><td>${fmt(w8)}</td></tr>`;
       })
       .join('');
 
@@ -608,8 +636,8 @@ export default function WorkAllocation() {
     <div class="print-header">Remplaçants</div>
     <div class="print-effective">Date de début d'exécution : ${effectiveDateStr}</div>
     <table class="print-repl-table">
-      <thead><tr><th>Poste</th><th>Remplaçant du jour 1</th><th>Remplaçant du jour 2</th><th>Remplaçant du soir 1</th><th>Remplaçant du soir 2</th></tr></thead>
-      <tbody>${replacementRows || '<tr><td colspan="5" class="text-center">Aucun remplaçant configuré</td></tr>'}</tbody>
+      <thead><tr><th>Poste</th><th>J1</th><th>J2</th><th>J3</th><th>J4</th><th>S1</th><th>S2</th><th>S3</th><th>S4</th></tr></thead>
+      <tbody>${replacementRows || '<tr><td colspan="9" class="text-center">Aucun remplaçant configuré</td></tr>'}</tbody>
     </table>`;
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
@@ -825,7 +853,7 @@ export default function WorkAllocation() {
 
           {replacementPostId && (() => {
             const post = posts.find((p) => p.id === replacementPostId);
-            const defaultSlot: ReplacementSlot = { r1: null, r2: null, r3: null, r4: null };
+            const defaultSlot: ReplacementSlot = { r1: null, r2: null, r3: null, r4: null, r5: null, r6: null, r7: null, r8: null };
             const slot = replacementByPostId[replacementPostId] ?? defaultSlot;
             const workersSorted = [...workers].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
             const workersJour = workersSorted.filter((w) => WORKER_TYPES_JOUR.includes(w.type));
@@ -840,7 +868,7 @@ export default function WorkAllocation() {
                   {REPLACEMENT_LABELS.map(([key, label]) => {
                     const value = slot[key];
                     const otherIds = (REPLACEMENT_LABELS.map(([k]) => k) as (keyof ReplacementSlot)[]).filter((k) => k !== key).map((k) => slot[k]).filter(Boolean) as string[];
-                    const pool = key === 'r1' || key === 'r2' ? workersJour : workersSoir;
+                    const pool = ['r1', 'r2', 'r3', 'r4'].includes(key) ? workersJour : workersSoir;
                     let options = pool.filter((w) => w.id === value || !otherIds.includes(w.id));
                     if (value && !options.some((w) => w.id === value)) {
                       const selected = workers.find((w) => w.id === value);

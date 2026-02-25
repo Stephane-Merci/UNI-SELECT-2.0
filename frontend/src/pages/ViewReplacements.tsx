@@ -98,27 +98,43 @@ export default function ViewReplacements() {
                 <thead>
                   <tr className="bg-gray-50">
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Poste</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant du jour 1</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant du jour 2</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant du soir 1</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Remplaçant du soir 2</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Jour 1</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Jour 2</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Jour 3</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Jour 4</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Soir 1</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Soir 2</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Soir 3</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Soir 4</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {replacements.map((r) => (
                     <tr key={r.id} className="hover:bg-gray-50">
                       <td className="px-4 py-2 text-sm font-medium text-gray-900">{r.post?.name ?? r.postId}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
+                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
                         {r.replacement1Worker ? `(${r.replacement1Worker.anciennete}) ${r.replacement1Worker.name}` : '—'}
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
+                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
                         {r.replacement2Worker ? `(${r.replacement2Worker.anciennete}) ${r.replacement2Worker.name}` : '—'}
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
+                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
                         {r.replacement3Worker ? `(${r.replacement3Worker.anciennete}) ${r.replacement3Worker.name}` : '—'}
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
+                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
                         {r.replacement4Worker ? `(${r.replacement4Worker.anciennete}) ${r.replacement4Worker.name}` : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
+                        {r.replacement5Worker ? `(${r.replacement5Worker.anciennete}) ${r.replacement5Worker.name}` : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
+                        {r.replacement6Worker ? `(${r.replacement6Worker.anciennete}) ${r.replacement6Worker.name}` : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
+                        {r.replacement7Worker ? `(${r.replacement7Worker.anciennete}) ${r.replacement7Worker.name}` : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
+                        {r.replacement8Worker ? `(${r.replacement8Worker.anciennete}) ${r.replacement8Worker.name}` : '—'}
                       </td>
                     </tr>
                   ))}
