@@ -292,7 +292,7 @@ export default function Admin() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredWorkers.map((w) => (
-                <tr key={w.id} className="hover:bg-blue-50 transition-colors even:bg-gray-50/50">
+                <tr key={w.id} className="hover:bg-blue-50 transition-colors even:bg-gray-100">
                   <td className="px-4 py-3">
                     {editingWorkerId === w.id ? (
                       <input
@@ -465,7 +465,7 @@ export default function Admin() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredPosts.map((p) => (
-                <tr key={p.id} className="hover:bg-green-50 transition-colors even:bg-gray-50/50">
+                <tr key={p.id} className="hover:bg-green-50 transition-colors even:bg-gray-100">
                   <td className="px-4 py-3">
                     {editingPostId === p.id ? (
                       <input

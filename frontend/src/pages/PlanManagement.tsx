@@ -1042,12 +1042,14 @@ export default function PlanManagement() {
                 Annuler l&apos;action
               </button>
             )}
-            <Link
-              to="/replacements"
-              className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700"
-            >
-              Voir remplacements
-            </Link>
+            {currentPlan && (
+              <Link
+                to="/replacements"
+                className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700"
+              >
+                Voir remplacements
+              </Link>
+            )}
             {currentPlan && (
               <Link
                 to={`/premium-state?planId=${currentPlan.id}`}
