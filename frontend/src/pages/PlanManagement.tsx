@@ -28,6 +28,7 @@ import PlanManagementModal from '../components/PlanManagementModal';
 import { io } from 'socket.io-client';
 import apiClient from '../api/client';
 import type { Booking, BookingReplacement } from '../types';
+import { formatLocalDate, getUTCDayOfWeek, normalizeToUTC } from '../utils/dateUtils';
 
 // 6 main availabilities — search filters only these.
 const MAIN_PRESENCE_GROUPS: Record<string, WorkerType[]> = {
@@ -452,14 +453,13 @@ export default function PlanManagement() {
       fetchAssignments(currentPlan.id);
 
       // Check for returning workers (whose absenceEndDate is <= current plan date)
-      const planDate = currentPlan.date ? new Date(currentPlan.date) : new Date();
-      planDate.setHours(0, 0, 0, 0);
+      const planDate = normalizeToUTC(currentPlan.date) || normalizeToUTC(new Date());
+      if (!planDate) return;
 
       const expWork = workers.find((w) => {
         if (!w.absenceEndDate) return false;
-        const endDate = new Date(w.absenceEndDate);
-        endDate.setHours(0, 0, 0, 0);
-        return endDate <= planDate;
+        const endDate = normalizeToUTC(w.absenceEndDate);
+        return endDate && endDate <= planDate;
       });
 
       if (expWork && !returningWorkerPrompt) {
@@ -478,8 +478,7 @@ export default function PlanManagement() {
       if (!currentPlan?.id || !currentPlan.date) return;
       if (preRetraiteAppliedPlanId === currentPlan.id) return;
 
-      const planDate = new Date(currentPlan.date);
-      const weekday = planDate.getDay(); // 0=Sunday, 1=Monday, ... 6=Saturday
+      const weekday = getUTCDayOfWeek(currentPlan.date); // 0=Sunday, 1=Monday, ... 6=Saturday
       const weekdayKey =
         weekday === 1
           ? 'MONDAY'
@@ -620,10 +619,10 @@ export default function PlanManagement() {
       try {
         const bookingsRes = await apiClient.get<Booking[]>('/bookings');
         const bookingsList = bookingsRes.data ?? [];
-        const planDate = currentPlan?.date ? new Date(currentPlan.date).getTime() : null;
+        const planDate = currentPlan?.date ? normalizeToUTC(currentPlan.date)?.getTime() : null;
         const chosenBooking =
           planDate != null
-            ? bookingsList.find((b) => new Date(b.effectiveDate).getTime() === planDate) ?? bookingsList[0]
+            ? bookingsList.find((b) => normalizeToUTC(b.effectiveDate)?.getTime() === planDate) ?? bookingsList[0]
             : bookingsList[0];
         if (chosenBooking) {
           const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
@@ -636,7 +635,7 @@ export default function PlanManagement() {
                 : [row.replacement5WorkerId, row.replacement6WorkerId, row.replacement7WorkerId, row.replacement8WorkerId];
             const optionIds = (ids.filter((id): id is string => !!id) as string[]).filter(Boolean);
 
-            const planDateStr = currentPlan?.date ? new Date(currentPlan.date).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : '';
+            const planDateStr = currentPlan?.date ? formatLocalDate(currentPlan.date, 'en-US', { weekday: 'long' }).toUpperCase() : '';
 
             const options = optionIds
               .map((id) => {
@@ -897,7 +896,7 @@ export default function PlanManagement() {
           const workersOnPost = workers.filter((w) => assignmentMap[w.id] === postId);
           const postName = posts.find((p) => p.id === postId)?.name ?? postId;
 
-          const planDateStr = currentPlan.date ? new Date(currentPlan.date).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : '';
+          const planDateStr = currentPlan.date ? formatLocalDate(currentPlan.date, 'en-US', { weekday: 'long' }).toUpperCase() : '';
 
           // Check Jour shift
           const jourWorkers = workersOnPost.filter((w) => WORKER_TYPES_JOUR.includes(w.type));
@@ -1025,9 +1024,7 @@ export default function PlanManagement() {
             </h1>
             {currentPlan && (
               <span className="text-sm text-gray-500">
-                {currentPlan.date
-                  ? new Date(currentPlan.date).toLocaleDateString('fr-FR')
-                  : ''}
+                {formatLocalDate(currentPlan.date)}
               </span>
             )}
           </div>

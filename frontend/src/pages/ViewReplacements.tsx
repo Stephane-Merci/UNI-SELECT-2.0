@@ -2,140 +2,130 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import apiClient from '../api/client';
 import { Booking, BookingReplacement } from '../types';
+import { formatLocalDate } from '../utils/dateUtils';
 
 export default function ViewReplacements() {
   const [searchParams] = useSearchParams();
-  const bookingIdFromUrl = searchParams.get('bookingId');
-
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<string>(searchParams.get('bookingId') || '');
   const [replacements, setReplacements] = useState<BookingReplacement[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
       try {
         const res = await apiClient.get<Booking[]>('/bookings');
-        if (!cancelled) {
-          const list = res.data ?? [];
-          setBookings(list);
-          if (bookingIdFromUrl && list.some((b) => b.id === bookingIdFromUrl)) {
-            setSelectedBookingId(bookingIdFromUrl);
-          }
-        }
-      } catch {
-        if (!cancelled) setBookings([]);
+        setBookings(res.data);
+      } catch (err: any) {
+        setError('Erreur lors du chargement des bookings');
       }
     })();
-    return () => { cancelled = true; };
-  }, [bookingIdFromUrl]);
+  }, []);
 
   useEffect(() => {
     if (!selectedBookingId) {
       setReplacements([]);
+      setLoading(false);
       return;
     }
+
     let cancelled = false;
-    setLoading(true);
     (async () => {
+      setLoading(true);
+      setError('');
       try {
         const res = await apiClient.get<BookingReplacement[]>(`/bookings/${selectedBookingId}/replacements`);
-        if (!cancelled) setReplacements(res.data ?? []);
-      } catch {
-        if (!cancelled) setReplacements([]);
+        if (!cancelled) {
+          setReplacements(res.data);
+        }
+      } catch (err: any) {
+        if (!cancelled) setError('Erreur lors du chargement des remplaçants');
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
+
     return () => { cancelled = true; };
   }, [selectedBookingId]);
 
-  const selectedBooking = bookings.find((b) => b.id === selectedBookingId);
+  const selectedBooking = selectedBookingId ? bookings.find(b => b.id === selectedBookingId) : null;
 
   return (
-    <div className="p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Link
-          to="/"
-          className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-        >
-          ← Retour au plan
-        </Link>
-        <h1 className="text-3xl font-bold text-gray-900">Voir remplacements</h1>
-      </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Visualisation des Remplaçants</h1>
+          <Link
+            to="/"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Retour au Plan
+          </Link>
+        </div>
 
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Booking</label>
-        <select
-          value={selectedBookingId ?? ''}
-          onChange={(e) => setSelectedBookingId(e.target.value || null)}
-          className="max-w-md px-3 py-2 border border-gray-300 rounded-md text-sm"
-        >
-          <option value="">— Sélectionner un booking —</option>
-          {bookings.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name} — {new Date(b.effectiveDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-            </option>
-          ))}
-        </select>
-      </div>
+        <div className="mb-6 max-w-xs">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Filtrer par Booking
+          </label>
+          <select
+            value={selectedBookingId}
+            onChange={(e) => setSelectedBookingId(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          >
+            <option value="">— Sélectionner un booking —</option>
+            {bookings.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name} — {formatLocalDate(b.effectiveDate, 'fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      {loading && <p className="text-gray-500 text-sm">Chargement…</p>}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 text-red-800 rounded-md border border-red-100">
+            {error}
+          </div>
+        )}
 
-      {!loading && selectedBookingId && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
           <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
             <span className="text-sm font-medium text-gray-700">
-              Remplaçants pour le booking « {selectedBooking?.name} » (début : {selectedBooking ? new Date(selectedBooking.effectiveDate).toLocaleDateString('fr-FR') : ''})
+              Remplaçants pour le booking « {selectedBooking?.name} » (début : {formatLocalDate(selectedBooking?.effectiveDate)})
             </span>
           </div>
           {replacements.length === 0 ? (
-            <p className="p-4 text-gray-500 text-sm italic">Aucun remplaçant configuré pour ce booking.</p>
+            <div className="p-8 text-center text-gray-500 italic">
+              {loading ? 'Chargement…' : 'Aucun remplaçant défini pour ce booking.'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Poste</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Jour 1</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Jour 2</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Jour 3</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Jour 4</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Soir 1</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Soir 2</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Soir 3</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Soir 4</th>
+                <thead className="bg-gray-50 text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Poste</th>
+                    <th className="px-4 py-2 text-center bg-blue-50/50">R1 (Jour)</th>
+                    <th className="px-4 py-2 text-center bg-blue-50/50">R2 (Jour)</th>
+                    <th className="px-4 py-2 text-center bg-blue-50/50">R3 (Jour)</th>
+                    <th className="px-4 py-2 text-center bg-blue-50/50">R4 (Jour)</th>
+                    <th className="px-4 py-2 text-center bg-amber-50/50">R5 (Soir)</th>
+                    <th className="px-4 py-2 text-center bg-amber-50/50">R6 (Soir)</th>
+                    <th className="px-4 py-2 text-center bg-amber-50/50">R7 (Soir)</th>
+                    <th className="px-4 py-2 text-center bg-amber-50/50">R8 (Soir)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-200">
                   {replacements.map((r) => (
                     <tr key={r.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-sm font-medium text-gray-900">{r.post?.name ?? r.postId}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
-                        {r.replacement1Worker ? `(${r.replacement1Worker.anciennete}) ${r.replacement1Worker.name}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
-                        {r.replacement2Worker ? `(${r.replacement2Worker.anciennete}) ${r.replacement2Worker.name}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
-                        {r.replacement3Worker ? `(${r.replacement3Worker.anciennete}) ${r.replacement3Worker.name}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
-                        {r.replacement4Worker ? `(${r.replacement4Worker.anciennete}) ${r.replacement4Worker.name}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
-                        {r.replacement5Worker ? `(${r.replacement5Worker.anciennete}) ${r.replacement5Worker.name}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
-                        {r.replacement6Worker ? `(${r.replacement6Worker.anciennete}) ${r.replacement6Worker.name}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
-                        {r.replacement7Worker ? `(${r.replacement7Worker.anciennete}) ${r.replacement7Worker.name}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700 whitespace-nowrap">
-                        {r.replacement8Worker ? `(${r.replacement8Worker.anciennete}) ${r.replacement8Worker.name}` : '—'}
-                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900 border-r">{r.post?.name ?? r.postId}</td>
+                      <ReplacementCell worker={r.replacement1Worker} className="bg-blue-50/10" />
+                      <ReplacementCell worker={r.replacement2Worker} className="bg-blue-50/10" />
+                      <ReplacementCell worker={r.replacement3Worker} className="bg-blue-50/10" />
+                      <ReplacementCell worker={r.replacement4Worker} className="bg-blue-50/10" />
+                      <ReplacementCell worker={r.replacement5Worker} className="bg-amber-50/10" />
+                      <ReplacementCell worker={r.replacement6Worker} className="bg-amber-50/10" />
+                      <ReplacementCell worker={r.replacement7Worker} className="bg-amber-50/10" />
+                      <ReplacementCell worker={r.replacement8Worker} className="bg-amber-50/10" />
                     </tr>
                   ))}
                 </tbody>
@@ -143,7 +133,17 @@ export default function ViewReplacements() {
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
+  );
+}
+
+function ReplacementCell({ worker, className = '' }: { worker: any; className?: string }) {
+  if (!worker) return <td className={`px-2 py-3 text-[10px] text-gray-300 text-center italic ${className}`}>— Vide —</td>;
+  return (
+    <td className={`px-2 py-3 border-r last:border-0 ${className}`}>
+      <div className="text-[11px] font-bold text-gray-900 text-center">({worker.anciennete})</div>
+      <div className="text-[10px] text-gray-600 text-center truncate" title={worker.name}>{worker.name}</div>
+    </td>
   );
 }

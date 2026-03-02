@@ -20,7 +20,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../store/useStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
-import { Worker, Post, WorkerTypeColors, Booking, BookingReplacement, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR, WorkerType } from '../types';
+import { Worker, Post, Booking, WorkerType, WorkerTypeColors, BookingReplacement, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR } from '../types';
+import { formatLocalDate } from '../utils/dateUtils';
 import PostColumn, { POST_COLUMN_DRAG_PREFIX } from '../components/PostColumn';
 import WorkerCard, { POST_DRAG_PREFIX, POST_DRAG_SEP } from '../components/WorkerCard';
 import { Link } from 'react-router-dom';
@@ -608,8 +609,8 @@ export default function WorkAllocation() {
     const title = 'Booking – Répartition par zone';
     const selectedBooking = selectedBookingId ? bookings.find((x) => x.id === selectedBookingId) : null;
     const effectiveDateStr = selectedBooking
-      ? new Date(selectedBooking.effectiveDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-      : new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      ? formatLocalDate(selectedBooking.effectiveDate, 'fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : formatLocalDate(new Date(), 'fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     const replacementEntries = Object.entries(replacementByPostId).filter(
       ([, slot]) => slot.r1 || slot.r2 || slot.r3 || slot.r4 || slot.r5 || slot.r6 || slot.r7 || slot.r8
@@ -784,7 +785,7 @@ export default function WorkAllocation() {
                 )}
                 <span className="text-sm font-medium text-gray-800">{b.name}</span>
                 <span className="text-xs text-gray-500">
-                  Début : {new Date(b.effectiveDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  Début : {formatLocalDate(b.effectiveDate, 'fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                 </span>
                 <button
                   type="button"

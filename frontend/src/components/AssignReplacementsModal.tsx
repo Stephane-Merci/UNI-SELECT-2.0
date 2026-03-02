@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import apiClient from '../api/client';
-import { Booking, Worker, BookingReplacement, Post, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR } from '../types';
+import { Booking, BookingReplacement, Worker, Post, WorkerType, WorkerTypeLabels, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR, WorkerTypeColors } from '../types';
+import { formatLocalDate } from '../utils/dateUtils';
 
 interface AssignReplacementsModalProps {
   booking: Booking;
@@ -37,7 +38,7 @@ export default function AssignReplacementsModal({
   const [addPostId, setAddPostId] = useState('');
 
   // Get weekday of booking to check pre-retraite
-  const bookingDay = new Date(booking.effectiveDate).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+  const bookingDay = formatLocalDate(booking.effectiveDate, 'en-US', { weekday: 'long' }).toUpperCase();
 
   // Post IDs that have at least one assignment in this booking (posts "in" the booking)
   const postIdsInBooking = Array.from(

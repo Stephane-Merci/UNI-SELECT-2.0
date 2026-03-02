@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import apiClient from '../api/client';
 import { useStore } from '../store/useStore';
-import { Booking, BookingReplacement, WorkerTypeLabels, WorkerType } from '../types';
+import { Booking, BookingReplacement, WorkerType, WorkerTypeLabels } from '../types';
+import { formatLocalDate } from '../utils/dateUtils';
 
 export default function PremiumState() {
     const [searchParams] = useSearchParams();
@@ -181,7 +182,7 @@ export default function PremiumState() {
                         <div className="text-right">
                             <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Période du Rapport</div>
                             <div className="text-gray-900 font-medium">
-                                {new Date(startDate).toLocaleDateString('fr-FR')} — {new Date(endDate).toLocaleDateString('fr-FR')}
+                                {formatLocalDate(startDate)} — {formatLocalDate(endDate)}
                             </div>
                         </div>
                     </div>
@@ -218,7 +219,7 @@ export default function PremiumState() {
                                 {reportData.map((row, idx) => (
                                     <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {new Date(row.date).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                                            {formatLocalDate(row.date, 'fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' })}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">
                                             {row.postName}

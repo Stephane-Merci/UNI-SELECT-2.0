@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { Plan, WorkerTypeColors } from '../types';
 import apiClient from '../api/client';
+import { formatLocalDate } from '../utils/dateUtils';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -268,7 +269,7 @@ export default function PlanManagementModal({
         </style>
         </head><body>
         <div class="print-header">${plan.name}</div>
-        <div class="print-date">${plan.date ? new Date(plan.date).toLocaleDateString('fr-FR') : ''}</div>
+        <div class="print-date">${formatLocalDate(plan.date)}</div>
         <div class="zones">${zoneCards}</div>
         </body></html>`;
       const w = window.open('', '_blank');
@@ -518,11 +519,7 @@ export default function PlanManagementModal({
                     <div className="flex justify-between items-center gap-2 flex-wrap">
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold">{plan.name}</h4>
-                        {plan.date && (
-                          <p className="text-sm text-gray-500">
-                            {new Date(plan.date).toLocaleDateString('fr-FR')}
-                          </p>
-                        )}
+                        {formatLocalDate(plan.date)}
                         <p className="text-xs text-gray-400 mt-1">
                           Créé le {new Date(plan.createdAt).toLocaleDateString('fr-FR')}
                         </p>
@@ -637,7 +634,7 @@ export default function PlanManagementModal({
                 <option value="">Sélectionner un plan</option>
                 {plans.map((plan) => (
                   <option key={plan.id} value={plan.id}>
-                    {plan.name} {plan.date && `(${new Date(plan.date).toLocaleDateString('fr-FR')})`}
+                    {plan.name} {plan.date && `(${formatLocalDate(plan.date)})`}
                   </option>
                 ))}
               </select>
