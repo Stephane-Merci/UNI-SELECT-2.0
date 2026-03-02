@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import apiClient from '../api/client';
-import { Booking, BookingReplacement, Worker, Post, WorkerType, WorkerTypeLabels, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR, WorkerTypeColors } from '../types';
+import { Booking, BookingReplacement, Worker, Post, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR } from '../types';
 import { formatLocalDate } from '../utils/dateUtils';
 
 interface AssignReplacementsModalProps {
