@@ -9,8 +9,6 @@ import Admin from './pages/Admin';
 import Documentation from './pages/Documentation';
 import Login from './pages/Login';
 import { useAuthStore } from './store/useAuthStore';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
 import PremiumState from './pages/PremiumState';
 
 function App() {
@@ -26,14 +24,6 @@ function App() {
         <Route
           path="/login"
           element={isAuthenticated ? <Navigate to="/" /> : <Login />}
-        />
-        <Route
-          path="/forgot-password"
-          element={<ForgotPassword />}
-        />
-        <Route
-          path="/reset-password"
-          element={<ResetPassword />}
         />
         <Route
           path="/"

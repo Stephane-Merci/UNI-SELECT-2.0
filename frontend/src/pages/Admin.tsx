@@ -87,9 +87,10 @@ export default function Admin() {
     preRetraiteDay: '',
   });
 
-  const [accountForm, setAccountForm] = useState<{ username: string; email: string }>({
+  const [accountForm, setAccountForm] = useState<{ username: string; password: string; confirmPassword: string }>({
     username: '',
-    email: '',
+    password: '',
+    confirmPassword: '',
   });
   const [accountMessage, setAccountMessage] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -233,15 +234,21 @@ export default function Admin() {
     e.preventDefault();
     setAccountMessage('');
     setError('');
+
+    if (accountForm.password !== accountForm.confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const response = await apiClient.post('/auth/register', {
         username: accountForm.username,
-        email: accountForm.email,
+        password: accountForm.password,
       });
-      setAccountMessage(response.data.message || 'Invitation envoyée avec succès (valide 1 semaine).');
-      setAccountForm({ username: '', email: '' });
+      setAccountMessage(response.data.message || 'Compte créé avec succès.');
+      setAccountForm({ username: '', password: '', confirmPassword: '' });
       setTimeout(() => setAccountMessage(''), 8000);
     } catch (e: any) {
       const msg = e?.response?.data?.error || e?.message || 'Erreur lors de la création du compte';
@@ -545,7 +552,7 @@ export default function Admin() {
         <h2 className="text-xl font-semibold text-gray-800 mb-3">Comptes (Managers)</h2>
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-lg">
           <p className="text-sm text-gray-600 mb-6">
-            Créez un nouveau compte pour un manager. Un email sera envoyé pour définir le mot de passe.
+            Créez un nouveau compte manager en définissant un identifiant et un mot de passe.
           </p>
 
           {accountMessage && (
@@ -566,7 +573,7 @@ export default function Admin() {
             </div>
           )}
 
-          <form onSubmit={handleCreateAccount} className="space-y-5">
+          <form onSubmit={handleCreateAccount} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Nom d'utilisateur <span className="text-red-500 font-normal">*</span>
@@ -579,22 +586,37 @@ export default function Admin() {
                 placeholder="Ex: jdoe"
                 required
               />
-              <p className="mt-1.5 text-xs text-gray-500">Utilisé pour la connexion. Format libre, min 3 caractères.</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Email <span className="text-red-500 font-normal">*</span>
-              </label>
-              <input
-                type="email"
-                value={accountForm.email}
-                onChange={(e) => setAccountForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
-                placeholder="Ex: john.doe@example.com"
-                required
-              />
-              <p className="mt-1.5 text-xs text-gray-500">L'utilisateur recevra un lien pour définir son mot de passe.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Mot de passe <span className="text-red-500 font-normal">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={accountForm.password}
+                  onChange={(e) => setAccountForm((f) => ({ ...f, password: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Confirmer le mot de passe <span className="text-red-500 font-normal">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={accountForm.confirmPassword}
+                  onChange={(e) => setAccountForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
             </div>
 
             <div className="pt-2">
@@ -611,7 +633,7 @@ export default function Admin() {
                     </svg>
                     Création en cours...
                   </span>
-                ) : 'Envoyer l\'invitation'}
+                ) : 'Créer le compte'}
               </button>
             </div>
           </form>
