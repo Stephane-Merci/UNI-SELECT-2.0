@@ -873,12 +873,16 @@ export default function PlanManagement() {
     });
 
     // Assign every worker to their original post only — do NOT auto-assign replacements to replacement posts
+    // Build a fresh assignment map from the workers we just assigned (React state is stale at this point)
+    const freshAssignmentMap: Record<string, string> = { ...assignmentMap };
     for (const w of toAssign) {
       await assignWorker(currentPlan.id, w.id, w.originalPostId);
+      freshAssignmentMap[w.id] = w.originalPostId;
     }
 
-    // After auto-assign, detect posts that have all their workers absent but have replacements defined.
+    // After auto-assign, detect posts that have all their workers absent/in-absence-zone but have replacements defined.
     // Show a popup so the manager can choose whether to assign those replacements.
+    // We use freshAssignmentMap (built above) instead of assignmentMap (which is stale React state).
     try {
       const bookingsRes = await apiClient.get<Booking[]>('/bookings');
       const bookingsList = bookingsRes.data ?? [];
@@ -893,7 +897,11 @@ export default function PlanManagement() {
         const items: any[] = [];
         for (const r of replList) {
           const postId = r.postId;
-          const workersOnPost = workers.filter((w) => assignmentMap[w.id] === postId);
+          // Use originalPostId to find ALL workers who belong to this post (present OR absent).
+          // freshAssignmentMap only contains workers who were actively assigned in this run;
+          // workers manually placed in an absence zone before auto-assign are not in the map,
+          // so checking originalPostId ensures we still detect that the post needs a replacement.
+          const workersOnPost = workers.filter((w) => w.originalPostId === postId);
           const postName = posts.find((p) => p.id === postId)?.name ?? postId;
 
           const planDateStr = currentPlan.date ? formatLocalDate(currentPlan.date, 'en-US', { weekday: 'long' }).toUpperCase() : '';
@@ -905,7 +913,8 @@ export default function PlanManagement() {
             return !ATTENDANCE_PRESENCE_TYPES.has(pt);
           });
 
-          if (activeJourWorkers.length === 0) {
+          // Only trigger replacement if there ARE scheduled jour workers on this post but ALL are absent/in-absence-zone
+          if (jourWorkers.length > 0 && activeJourWorkers.length === 0) {
             const workerIds = [r.replacement1WorkerId, r.replacement2WorkerId, r.replacement3WorkerId, r.replacement4WorkerId].filter((id): id is string => !!id);
             const options = workerIds
               .map((id) => {
@@ -917,12 +926,12 @@ export default function PlanManagement() {
                   WorkerType.PRERETRAITE, WorkerType.CONGE_PARENTAL, WorkerType.LIBERATION_EXTERNE
                 ].includes(presence);
                 const isPreRetraiteToday = w.preRetraiteDay === planDateStr;
-                const assignedPostId = assignmentMap[w.id];
-                const assignedElsewhere = !!assignedPostId;
+                const assignedPostId = freshAssignmentMap[w.id];
+                const assignedElsewhere = !!assignedPostId && assignedPostId !== postId;
 
                 let leavesReplacementPost = false;
                 if (assignedPostId) {
-                  const othersOnPost = workers.filter(other => other.id !== w.id && assignmentMap[other.id] === assignedPostId);
+                  const othersOnPost = workers.filter(other => other.id !== w.id && freshAssignmentMap[other.id] === assignedPostId);
                   const activeShiftOthers = othersOnPost.filter(o => {
                     const p = presenceMap[o.id] || o.type;
                     return !ATTENDANCE_PRESENCE_TYPES.has(p) && WORKER_TYPES_JOUR.includes(o.type);
@@ -958,7 +967,8 @@ export default function PlanManagement() {
             return !ATTENDANCE_PRESENCE_TYPES.has(pt);
           });
 
-          if (activeSoirWorkers.length === 0) {
+          // Only trigger replacement if there ARE scheduled soir workers on this post but ALL are absent/in-absence-zone
+          if (soirWorkers.length > 0 && activeSoirWorkers.length === 0) {
             const workerIds = [r.replacement5WorkerId, r.replacement6WorkerId, r.replacement7WorkerId, r.replacement8WorkerId].filter((id): id is string => !!id);
             const options = workerIds
               .map((id) => {
@@ -970,12 +980,12 @@ export default function PlanManagement() {
                   WorkerType.PRERETRAITE, WorkerType.CONGE_PARENTAL, WorkerType.LIBERATION_EXTERNE
                 ].includes(presence);
                 const isPreRetraiteToday = w.preRetraiteDay === planDateStr;
-                const assignedPostId = assignmentMap[w.id];
-                const assignedElsewhere = !!assignedPostId;
+                const assignedPostId = freshAssignmentMap[w.id];
+                const assignedElsewhere = !!assignedPostId && assignedPostId !== postId;
 
                 let leavesReplacementPost = false;
                 if (assignedPostId) {
-                  const othersOnPost = workers.filter(other => other.id !== w.id && assignmentMap[other.id] === assignedPostId);
+                  const othersOnPost = workers.filter(other => other.id !== w.id && freshAssignmentMap[other.id] === assignedPostId);
                   const activeShiftOthers = othersOnPost.filter(o => {
                     const p = presenceMap[o.id] || o.type;
                     return !ATTENDANCE_PRESENCE_TYPES.has(p) && WORKER_TYPES_SOIR.includes(o.type);
