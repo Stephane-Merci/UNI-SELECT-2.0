@@ -385,6 +385,88 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Reset plan to initial state (delete assignments, unfilled positions, reset presences)
+router.post('/:id/reset', async (req, res) => {
+  try {
+    const planId = req.params.id;
+
+    // Verify plan exists
+    const plan = await prisma.plan.findUnique({
+      where: { id: planId },
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    // Use transaction to ensure atomicity
+    await prisma.$transaction([
+      // 1. Delete all assignments
+      prisma.assignment.deleteMany({
+        where: { planId },
+      }),
+      // 2. Delete all unfilled positions
+      prisma.unfilledPosition.deleteMany({
+        where: { planId },
+      }),
+      // 3. Delete all presences
+      prisma.workerPresence.deleteMany({
+        where: { planId },
+      }),
+    ]);
+
+    // 4. Re-initialize presences with worker default types
+    const workers = await prisma.worker.findMany();
+    if (workers.length > 0) {
+      await prisma.workerPresence.createMany({
+        data: workers.map((worker) => ({
+          planId,
+          workerId: worker.id,
+          type: worker.type,
+        })),
+      });
+    }
+
+    // Fetch the reset plan with all relations
+    const resetPlan = await prisma.plan.findUnique({
+      where: { id: planId },
+      include: {
+        assignments: {
+          include: {
+            worker: {
+              include: {
+                originalPost: true,
+              },
+            },
+            post: true,
+          },
+        },
+        unfilledPositions: true,
+        workerPresences: {
+          include: {
+            worker: {
+              include: {
+                originalPost: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Emit real-time update
+    io.emit('plan-updated', {
+      plan: resetPlan,
+      room: 'main',
+    });
+
+    res.json(resetPlan);
+  } catch (error) {
+    console.error('Error resetting plan:', error);
+    res.status(500).json({ error: 'Failed to reset plan' });
+  }
+});
+
 // Delete plan
 router.delete('/:id', async (req, res) => {
   try {

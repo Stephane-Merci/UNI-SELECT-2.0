@@ -1071,6 +1071,24 @@ export default function PlanManagement() {
             >
               {currentPlan ? 'Gérer les Plans' : 'Créer un Plan'}
             </button>
+            {currentPlan && (
+              <button
+                onClick={async () => {
+                  if (window.confirm(`Êtes-vous sûr de vouloir réinitialiser le plan « ${currentPlan.name} » ? Toutes les assignations et postes à combler seront supprimés.`)) {
+                    try {
+                      const { resetPlan } = useStore.getState();
+                      await resetPlan(currentPlan.id);
+                    } catch (error: any) {
+                      alert(error.message || 'Échec de la réinitialisation du plan');
+                    }
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm"
+                title="Réinitialiser le plan à son état initial"
+              >
+                Réinitialiser le Plan
+              </button>
+            )}
           </div>
         </div>
       </div>

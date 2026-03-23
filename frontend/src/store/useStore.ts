@@ -88,6 +88,7 @@ interface AppState {
   removeAssignment: (assignmentId: string) => Promise<void>;
   addUnfilledPosition: (planId: string, postId: string) => Promise<void>;
   deleteUnfilledPosition: (unfilledPositionId: string) => Promise<void>;
+  resetPlan: (planId: string) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -507,6 +508,23 @@ export const useStore = create<AppState>((set, get) => ({
       });
     } catch (error: any) {
       set({ error: error.message });
+      throw error;
+    }
+  },
+  resetPlan: async (planId) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await apiClient.post(`/plans/${planId}/reset`);
+      const resetPlan = response.data;
+      set({
+        currentPlan: resetPlan,
+        assignments: resetPlan.assignments || [],
+        workerPresences: resetPlan.workerPresences || [],
+        loading: false,
+      });
+      // Real-time update will be handled by socket, but we return early
+    } catch (error: any) {
+      set({ error: error.message, loading: false });
       throw error;
     }
   },
