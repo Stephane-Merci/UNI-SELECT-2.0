@@ -187,12 +187,41 @@ router.patch('/:id/type', async (req, res) => {
       return res.status(400).json({ error: 'Invalid worker type' });
     }
 
+    const worker = await prisma.worker.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!worker) {
+      return res.status(404).json({ error: 'Worker not found' });
+    }
+
+    const ABSENCE_TYPES = [
+      WorkerType.ABSENT,
+      WorkerType.VACANCES,
+      WorkerType.LIBERATION_EXTERNE,
+      WorkerType.INVALIDITE,
+      WorkerType.CONGE_PARENTAL
+    ];
+
+    const wasAbsent = ABSENCE_TYPES.includes(worker.type);
+    const isNowAbsent = ABSENCE_TYPES.includes(type as WorkerType);
+
     const data: any = { type };
+
+    // New absence entry: set start date
+    if (isNowAbsent && !wasAbsent) {
+      data.absenceStartDate = new Date();
+    } 
+    // Returning to work: clear absence dates
+    else if (!isNowAbsent) {
+      data.absenceStartDate = null;
+      data.absenceEndDate = null;
+    }
+
     if (absenceEndDate !== undefined) {
       data.absenceEndDate = absenceEndDate ? new Date(absenceEndDate) : null;
     }
 
-    const worker = await prisma.worker.update({
+    const updatedWorker = await prisma.worker.update({
       where: { id: req.params.id },
       data,
       include: {
@@ -200,9 +229,10 @@ router.patch('/:id/type', async (req, res) => {
       },
     });
 
-    io.emit('worker-type-changed', { worker, room: 'main' });
-    res.json(worker);
+    io.emit('worker-type-changed', { worker: updatedWorker, room: 'main' });
+    res.json(updatedWorker);
   } catch (error) {
+    console.error('Error updating worker type:', error);
     res.status(500).json({ error: 'Failed to update worker type' });
   }
 });

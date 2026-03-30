@@ -478,6 +478,9 @@ export default function PlanManagement() {
       if (!currentPlan?.id || !currentPlan.date) return;
       if (preRetraiteAppliedPlanId === currentPlan.id) return;
 
+      // Mark as applied immediately to prevent re-entry during async calls
+      setPreRetraiteAppliedPlanId(currentPlan.id);
+
       const weekday = getUTCDayOfWeek(currentPlan.date); // 0=Sunday, 1=Monday, ... 6=Saturday
       const weekdayKey =
         weekday === 1
@@ -491,29 +494,30 @@ export default function PlanManagement() {
                 : weekday === 5
                   ? 'FRIDAY'
                   : null;
-      if (!weekdayKey) {
-        setPreRetraiteAppliedPlanId(currentPlan.id);
-        return;
-      }
+
+      if (!weekdayKey) return;
 
       const affected = workers.filter((w) => w.preRetraiteDay === weekdayKey);
-      if (affected.length === 0) {
-        setPreRetraiteAppliedPlanId(currentPlan.id);
-        return;
-      }
+      if (affected.length === 0) return;
 
       for (const w of affected) {
         await updateWorkerPresence(currentPlan.id, w.id, WorkerType.PRERETRAITE);
+        // Also remove assignment if exists, to ensure they are "sent" to the presence zone completely
+        const existingAssignment = assignments.find(
+          (a) => a.workerId === w.id && a.planId === currentPlan.id
+        );
+        if (existingAssignment) {
+          await removeAssignment(existingAssignment.id);
+        }
       }
 
-      setPreRetraiteAppliedPlanId(currentPlan.id);
       setPreRetraiteInfo(
         affected.map((w) => `(${w.anciennete}) ${w.name}`)
       );
     };
 
     void applyPreRetraiteForPlan();
-  }, [currentPlan, workers, updateWorkerPresence, preRetraiteAppliedPlanId]);
+  }, [currentPlan, workers, updateWorkerPresence, removeAssignment, assignments, preRetraiteAppliedPlanId]);
 
   useEffect(() => {
     const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';

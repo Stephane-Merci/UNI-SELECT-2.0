@@ -90,6 +90,8 @@ export interface Worker {
   preRetraiteDay?: string | null;
   /** Final day of absence (e.g. vacation, sick leave). */
   absenceEndDate?: string | null;
+  /** First day of absence. */
+  absenceStartDate?: string | null;
   assignments?: Assignment[];
   createdAt: string;
   updatedAt: string;

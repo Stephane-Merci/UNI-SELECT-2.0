@@ -57,6 +57,14 @@ export default function WorkerCard({
   };
 
   const postName = worker.originalPost?.name ?? '-';
+  const absenceEndDateStr = worker.absenceEndDate;
+  const isAbsent = [
+    WorkerType.ABSENT,
+    WorkerType.VACANCES,
+    WorkerType.LIBERATION_EXTERNE,
+    WorkerType.INVALIDITE,
+    WorkerType.CONGE_PARENTAL
+  ].includes(displayType);
 
   return (
     <div
@@ -68,8 +76,13 @@ export default function WorkerCard({
     >
       <div className="flex flex-col gap-px">
         <div className="font-medium text-gray-900 truncate">({worker.anciennete}) {worker.name}</div>
-        <div className="text-gray-500 text-[9px] truncate" title={postName}>
-          {postName}
+        <div className="flex justify-between items-center text-gray-500 text-[9px]">
+          <span className="truncate" title={postName}>{postName}</span>
+          {isAbsent && absenceEndDateStr && (
+            <span className="text-red-600 font-bold ml-1 shrink-0">
+              ➜ {new Date(absenceEndDateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+            </span>
+          )}
         </div>
       </div>
     </div>
