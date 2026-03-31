@@ -138,6 +138,46 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Delete manager by username
+router.delete('/:username', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const { username } = req.params;
+    const currentUser = req.user;
+
+    // Check if current user has permission to manage accounts
+    const manager = await prisma.manager.findUnique({
+      where: { id: currentUser?.id },
+    });
+
+    if (!manager || !manager.canCreateAccounts) {
+      return res.status(403).json({ error: "Vous n'avez pas la permission de supprimer des comptes." });
+    }
+
+    // Prevent deleting itself
+    if (manager.username === username) {
+      return res.status(400).json({ error: "Vous ne pouvez pas supprimer votre propre compte." });
+    }
+
+    // Check if target user exists
+    const target = await prisma.manager.findUnique({
+      where: { username },
+    });
+
+    if (!target) {
+      return res.status(404).json({ error: "Utilisateur non trouvé." });
+    }
+
+    await prisma.manager.delete({
+      where: { username },
+    });
+
+    res.json({ message: `Le compte '${username}' a été supprimé avec succès.` });
+  } catch (error) {
+    console.error('Delete manager error:', error);
+    res.status(500).json({ error: 'Erreur lors de la suppression du compte.' });
+  }
+});
+
 export default router;
 
 

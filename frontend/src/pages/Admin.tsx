@@ -107,7 +107,7 @@ export default function Admin() {
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
-    type: 'worker' | 'post';
+    type: 'worker' | 'post' | 'manager';
     id: string;
     name: string;
   }>({
@@ -250,6 +250,28 @@ export default function Admin() {
       await fetchWorkers();
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'Erreur lors de la suppression du travailleur');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmDeleteManager = (manager: Manager) => {
+    setDeleteModal({
+      isOpen: true,
+      type: 'manager',
+      id: manager.username,
+      name: manager.username,
+    });
+  };
+
+  const handleDeleteManager = async (username: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      await apiClient.delete(`/auth/${username}`);
+      await fetchManagers();
+    } catch (e: any) {
+      setError(e?.response?.data?.error || e?.message || 'Erreur lors de la suppression du compte');
     } finally {
       setLoading(false);
     }
@@ -815,11 +837,23 @@ export default function Admin() {
                             {m.canCreateAccounts ? 'Oui' : 'Non'}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-right">
+                        <td className="px-4 py-4 text-right flex items-center justify-end gap-2">
                           {user?.username === m.username ? (
                             <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold uppercase">Moi</span>
                           ) : (
-                            <span className="text-xs text-gray-400">Manager</span>
+                            <>
+                              <span className="text-xs text-gray-400">Manager</span>
+                              <button
+                                type="button"
+                                onClick={() => confirmDeleteManager(m)}
+                                className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="Supprimer ce compte"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </>
                           )}
                         </td>
                       </tr>
@@ -842,9 +876,13 @@ export default function Admin() {
         onClose={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
         onConfirm={() => {
           if (deleteModal.type === 'worker') handleDeleteWorker(deleteModal.id);
-          else handleDeletePost(deleteModal.id);
+          else if (deleteModal.type === 'post') handleDeletePost(deleteModal.id);
+          else if (deleteModal.type === 'manager') handleDeleteManager(deleteModal.id);
         }}
-        title={`Supprimer le ${deleteModal.type === 'worker' ? 'travailleur' : 'poste'}`}
+        title={`Supprimer ${
+          deleteModal.type === 'worker' ? 'le travailleur' : 
+          deleteModal.type === 'post' ? 'le poste' : 'le compte'
+        }`}
         message={`Vous êtes sur le point de supprimer définivement cet élément.`}
         itemName={deleteModal.name}
       />
