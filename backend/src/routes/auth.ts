@@ -12,6 +12,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 const registerSchema = z.object({
   username: z.string().min(3),
   password: z.string().min(6),
+  canEdit: z.boolean().default(true),
+  canPrint: z.boolean().default(true),
+  canCreateAccounts: z.boolean().default(true),
 });
 
 const loginSchema = z.object({
@@ -38,14 +41,23 @@ router.post('/register', async (req, res) => {
     const manager = await prisma.manager.create({
       data: {
         username: data.username,
-        email: `${data.username}@uniselect.local`, // Placeholder since email is currently required and unique in schema
+        email: `${data.username}@uniselect.local`, 
         passwordHash,
+        canEdit: data.canEdit,
+        canPrint: data.canPrint,
+        canCreateAccounts: data.canCreateAccounts,
       },
     });
 
     res.status(201).json({
       message: 'Compte créé avec succès.',
-      manager: { id: manager.id, username: manager.username }
+      manager: { 
+        id: manager.id, 
+        username: manager.username,
+        canEdit: manager.canEdit,
+        canPrint: manager.canPrint,
+        canCreateAccounts: manager.canCreateAccounts
+      }
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -74,8 +86,26 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Identifiants invalides' });
     }
 
-    const token = jwt.sign({ id: manager.id, username: manager.username }, JWT_SECRET);
-    res.json({ token, manager: { id: manager.id, username: manager.username } });
+    const tokenPayload = { 
+      id: manager.id, 
+      username: manager.username,
+      canEdit: manager.canEdit,
+      canPrint: manager.canPrint,
+      canCreateAccounts: manager.canCreateAccounts
+    };
+    
+    const token = jwt.sign(tokenPayload, JWT_SECRET);
+
+    res.json({ 
+      token, 
+      manager: { 
+        id: manager.id, 
+        username: manager.username,
+        canEdit: manager.canEdit,
+        canPrint: manager.canPrint,
+        canCreateAccounts: manager.canCreateAccounts
+      } 
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });

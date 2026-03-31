@@ -175,6 +175,9 @@ model Manager {
   resetTokenExpiry DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  canEdit           Boolean  @default(true)
+  canPrint          Boolean  @default(true)
+  canCreateAccounts Boolean  @default(true)
 
   @@index([username])
   @@index([email])
