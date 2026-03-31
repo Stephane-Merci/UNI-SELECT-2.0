@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Manager" ADD COLUMN "canCreateAccounts" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "canEdit" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "canPrint" BOOLEAN NOT NULL DEFAULT true;
