@@ -276,6 +276,8 @@ function PostsPanel({
   unfilledPositions,
   onAddUnfilled,
   onDeleteUnfilled,
+  shiftFilter,
+  onShiftFilterChange,
 }: {
   posts: Post[];
   workers: Worker[];
@@ -287,12 +289,19 @@ function PostsPanel({
   unfilledPositions: any[];
   onAddUnfilled: (postId: string) => void;
   onDeleteUnfilled: (id: string) => void;
+  shiftFilter: 'jour' | 'soir' | 'tous';
+  onShiftFilterChange: (s: 'jour' | 'soir' | 'tous') => void;
 }) {
   const getWorkersForPost = (postId: string) => {
     return workers
       .filter((worker) => {
         if (assignments[worker.id] !== postId) return false;
         const pt = presences[worker.id] ?? worker.type;
+        
+        // Filter by shift if needed
+        if (shiftFilter === 'jour' && !WORKER_TYPES_JOUR.includes(pt)) return false;
+        if (shiftFilter === 'soir' && !WORKER_TYPES_SOIR.includes(pt)) return false;
+
         return !attendancePresenceTypes.has(pt);
       })
       .sort((a, b) => a.anciennete.localeCompare(b.anciennete, 'fr', { numeric: true }));
@@ -308,7 +317,29 @@ function PostsPanel({
 
   return (
     <div className="h-full flex flex-col">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">Postes</h2>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h2 className="text-xl font-bold text-gray-800">Postes</h2>
+        <div className="flex bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => onShiftFilterChange('jour')}
+            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${shiftFilter === 'jour' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Jour
+          </button>
+          <button
+            onClick={() => onShiftFilterChange('soir')}
+            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${shiftFilter === 'soir' ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Soir
+          </button>
+          <button
+            onClick={() => onShiftFilterChange('tous')}
+            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${shiftFilter === 'tous' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Tous
+          </button>
+        </div>
+      </div>
       <div className="flex-1 overflow-y-auto">
         <SortableContext
           items={sortablePostIds}
@@ -427,6 +458,8 @@ export default function PlanManagement() {
     newType: WorkerType;
     newEndDate: string;
   } | null>(null);
+
+  const [shiftFilter, setShiftFilter] = useState<'jour' | 'soir' | 'tous'>('tous');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1122,6 +1155,8 @@ export default function PlanManagement() {
                 unfilledPositions={currentPlan?.unfilledPositions || []}
                 onAddUnfilled={(postId) => currentPlan && addUnfilledPosition(currentPlan.id, postId)}
                 onDeleteUnfilled={deleteUnfilledPosition}
+                shiftFilter={shiftFilter}
+                onShiftFilterChange={setShiftFilter}
               />
             </div>
 
