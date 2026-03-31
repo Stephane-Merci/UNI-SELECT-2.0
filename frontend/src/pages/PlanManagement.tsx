@@ -20,6 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../store/useStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
 import { Worker, Post, WorkerType, WorkerTypeLabels, WorkerTypeColors, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR, ORIGIN_TYPES } from '../types';
 import PostColumn, { POST_COLUMN_DRAG_PREFIX } from '../components/PostColumn';
@@ -460,6 +461,7 @@ export default function PlanManagement() {
   } | null>(null);
 
   const [shiftFilter, setShiftFilter] = useState<'jour' | 'soir' | 'tous'>('tous');
+  const { user } = useAuthStore();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -739,6 +741,7 @@ export default function PlanManagement() {
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!user?.canEdit) return;
     const { active, over } = event;
     setActiveWorker(null);
 
@@ -1076,7 +1079,7 @@ export default function PlanManagement() {
             )}
           </div>
           <div className="flex items-center space-x-4">
-            {currentPlan && lastPlanAction && (
+            {user?.canEdit && currentPlan && lastPlanAction && (
               <button
                 type="button"
                 onClick={handleUndoPlan}
@@ -1108,7 +1111,7 @@ export default function PlanManagement() {
             >
               {currentPlan ? 'Gérer les Plans' : 'Créer un Plan'}
             </button>
-            {currentPlan && (
+            {user?.canEdit && currentPlan && (
               <button
                 onClick={async () => {
                   if (window.confirm(`Êtes-vous sûr de vouloir réinitialiser le plan « ${currentPlan.name} » ? Toutes les assignations et postes à combler seront supprimés.`)) {
@@ -1133,7 +1136,7 @@ export default function PlanManagement() {
       {/* Main Content - Two Panels */}
       {currentPlan ? (
         <DndContext
-          sensors={sensors}
+          sensors={user?.canEdit ? sensors : []}
           collisionDetection={pointerWithin}
           onDragStart={wrapDragStart(handleDragStart)}
           onDragEnd={wrapDragEnd(handleDragEnd)}

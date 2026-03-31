@@ -4,6 +4,7 @@ import apiClient from '../api/client';
 import { useStore } from '../store/useStore';
 import { Booking, BookingReplacement, WorkerType, WorkerTypeLabels } from '../types';
 import { formatLocalDate } from '../utils/dateUtils';
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function PremiumState() {
     const [searchParams] = useSearchParams();
@@ -14,6 +15,7 @@ export default function PremiumState() {
     const [replacements, setReplacements] = useState<BookingReplacement[]>([]);
     const [loading, setLoading] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
+    const { user } = useAuthStore();
 
     // Date range state
     const [startDate, setStartDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
@@ -160,15 +162,17 @@ export default function PremiumState() {
                         Générer
                     </button>
 
-                    <button
-                        onClick={handlePrint}
-                        className="ml-auto flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-all shadow-indigo-200 shadow-lg active:scale-95"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                        </svg>
-                        Imprimer
-                    </button>
+                    {user?.canPrint && (
+                        <button
+                            onClick={handlePrint}
+                            className="ml-auto flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-all shadow-indigo-200 shadow-lg active:scale-95"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            Imprimer
+                        </button>
+                    )}
                 </div>
             </div>
 

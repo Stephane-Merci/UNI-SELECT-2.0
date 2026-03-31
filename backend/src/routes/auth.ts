@@ -114,6 +114,30 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// List all managers (Only should be allowed by managers who can create accounts)
+router.get('/', async (req, res) => {
+  try {
+    const managers = await prisma.manager.findMany({
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        canEdit: true,
+        canPrint: true,
+        canCreateAccounts: true,
+        createdAt: true,
+      },
+      orderBy: {
+        username: 'asc',
+      },
+    });
+    res.json(managers);
+  } catch (error) {
+    console.error('List managers error:', error);
+    res.status(500).json({ error: 'Erreur lors de la récupération des managers.' });
+  }
+});
+
 export default router;
 
 

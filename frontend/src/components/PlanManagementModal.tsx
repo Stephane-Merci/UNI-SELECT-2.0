@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { Plan, WorkerTypeColors } from '../types';
 import apiClient from '../api/client';
+import { useAuthStore } from '../store/useAuthStore';
 import { formatLocalDate } from '../utils/dateUtils';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -36,6 +37,7 @@ export default function PlanManagementModal({
   const [deleteStart, setDeleteStart] = useState('');
   const [deleteEnd, setDeleteEnd] = useState('');
   const { deletePlansByRange, fetchPlans, deletePlan } = useStore();
+  const { user } = useAuthStore();
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -371,24 +373,28 @@ export default function PlanManagementModal({
           >
             Plans Existants
           </button>
-          <button
-            onClick={() => setActiveTab('create')}
-            className={`px-4 py-2 font-medium ${activeTab === 'create'
-              ? 'text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            Nouveau Plan
-          </button>
-          <button
-            onClick={() => setActiveTab('copy')}
-            className={`px-4 py-2 font-medium ${activeTab === 'copy'
-              ? 'text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            Copier un Plan
-          </button>
+          {user?.canEdit && (
+            <>
+              <button
+                onClick={() => setActiveTab('create')}
+                className={`px-4 py-2 font-medium ${activeTab === 'create'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
+              >
+                Nouveau Plan
+              </button>
+              <button
+                onClick={() => setActiveTab('copy')}
+                className={`px-4 py-2 font-medium ${activeTab === 'copy'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
+              >
+                Copier un Plan
+              </button>
+            </>
+          )}
         </div>
 
         {error && (
@@ -403,20 +409,24 @@ export default function PlanManagementModal({
             <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
               <h3 className="font-semibold text-lg">Sélectionner un Plan</h3>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setShowExportRange((v) => !v); setShowDeleteRange(false); setError(''); }}
-                  className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100"
-                >
-                  Exporter
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowDeleteRange((v) => !v); setShowExportRange(false); setError(''); }}
-                  className="px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100"
-                >
-                  Supprimer
-                </button>
+                {user?.canPrint && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowExportRange((v) => !v); setShowDeleteRange(false); setError(''); }}
+                    className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100"
+                  >
+                    Exporter
+                  </button>
+                )}
+                {user?.canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowDeleteRange((v) => !v); setShowExportRange(false); setError(''); }}
+                    className="px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100"
+                  >
+                    Supprimer
+                  </button>
+                )}
               </div>
             </div>
             {showExportRange && (
@@ -525,39 +535,45 @@ export default function PlanManagementModal({
                         </p>
                       </div>
                       <div className="flex items-center gap-1" data-plan-actions>
-                        <button
-                          type="button"
-                          onClick={(e) => handlePrintPlan(plan, e)}
-                          disabled={loading}
-                          className="p-2 text-gray-600 hover:bg-gray-200 rounded-md disabled:opacity-50"
-                          title="Imprimer"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleExportPlan(plan, e)}
-                          disabled={loading}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-md disabled:opacity-50"
-                          title="Exporter Excel"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeletePlan(plan, e)}
-                          disabled={loading}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-md disabled:opacity-50"
-                          title="Supprimer"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                        {user?.canPrint && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => handlePrintPlan(plan, e)}
+                              disabled={loading}
+                              className="p-2 text-gray-600 hover:bg-gray-200 rounded-md disabled:opacity-50"
+                              title="Imprimer"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleExportPlan(plan, e)}
+                              disabled={loading}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-md disabled:opacity-50"
+                              title="Exporter Excel"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                        {user?.canEdit && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeletePlan(plan, e)}
+                            disabled={loading}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-md disabled:opacity-50"
+                            title="Supprimer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                       {currentPlan?.id === plan.id && (
                         <span className="px-3 py-1 bg-blue-600 text-white text-sm rounded-full">

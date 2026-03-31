@@ -189,3 +189,11 @@ export interface BookingReplacement {
   replacement8WorkerId: string | null;
   replacement8Worker?: Worker | null;
 }
+
+export interface Manager {
+  id: string;
+  username: string;
+  canEdit: boolean;
+  canPrint: boolean;
+  canCreateAccounts: boolean;
+}

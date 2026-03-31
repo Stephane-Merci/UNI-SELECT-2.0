@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../store/useStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
 import { Worker, Post, Booking, WorkerType, WorkerTypeColors, BookingReplacement, WORKER_TYPES_JOUR, WORKER_TYPES_SOIR } from '../types';
 import { formatLocalDate } from '../utils/dateUtils';
@@ -171,6 +172,8 @@ export default function WorkAllocation() {
     planLayoutVersion,
   } = useStore();
 
+  const { user } = useAuthStore();
+
   const BOOKING_LAYOUT_KEY = 'work-allocation';
   const orderedPosts =
     posts.length > 0
@@ -296,6 +299,7 @@ export default function WorkAllocation() {
   );
 
   const handleDragStart = (event: DragStartEvent) => {
+    if (!user?.canEdit) return;
     const activeId = String(event.active.id);
     let workerId = activeId;
     if (activeId.includes(POST_DRAG_SEP)) workerId = activeId.split(POST_DRAG_SEP)[1] ?? activeId;
@@ -314,6 +318,7 @@ export default function WorkAllocation() {
   }, [localZoneMap]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!user?.canEdit) return;
     const { active, over } = event;
     setActiveWorker(null);
     if (!over) return;
@@ -687,7 +692,7 @@ export default function WorkAllocation() {
       <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-gray-900">Booking</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          {canUndo && (
+          {user?.canEdit && canUndo && (
             <button
               type="button"
               onClick={handleUndo}
@@ -697,7 +702,7 @@ export default function WorkAllocation() {
               Annuler l&apos;action
             </button>
           )}
-          {!inMeeting ? (
+          {user?.canEdit && !inMeeting ? (
             <button
               type="button"
               onClick={handleStart}
@@ -705,7 +710,7 @@ export default function WorkAllocation() {
             >
               Commencer le booking
             </button>
-          ) : (
+          ) : user?.canEdit && inMeeting ? (
             <>
               <button
                 type="button"
@@ -735,15 +740,17 @@ export default function WorkAllocation() {
                 Annuler
               </button>
             </>
+          ) : null}
+          {user?.canPrint && (
+            <button
+              type="button"
+              onClick={handlePrintBooking}
+              className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700"
+              title="Imprimer la répartition actuelle"
+            >
+              Imprimer
+            </button>
           )}
-          <button
-            type="button"
-            onClick={handlePrintBooking}
-            className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700"
-            title="Imprimer la répartition actuelle"
-          >
-            Imprimer
-          </button>
           {selectedBookingId && (
             <Link
               to={`/replacements?bookingId=${selectedBookingId}`}
@@ -787,34 +794,38 @@ export default function WorkAllocation() {
                 <span className="text-xs text-gray-500">
                   Début : {formatLocalDate(b.effectiveDate, 'fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                 </span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); handleContinueBooking(b); }}
-                  className="px-2 py-1 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700"
-                  title="Continuer / modifier ce booking"
-                >
-                  Modifier
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); openApplyBookingConfirm(b); }}
-                  disabled={activatingId === b.id}
-                  className="px-2 py-1 text-xs font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {activatingId === b.id ? '…' : 'Appliquer'}
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); handleDeleteBooking(b.id, b.name); }}
-                  disabled={deletingId === b.id}
-                  className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
-                  title="Supprimer le booking"
-                  aria-label="Supprimer"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </button>
+                {user?.canEdit && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleContinueBooking(b); }}
+                      className="px-2 py-1 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700"
+                      title="Continuer / modifier ce booking"
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); openApplyBookingConfirm(b); }}
+                      disabled={activatingId === b.id}
+                      className="px-2 py-1 text-xs font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {activatingId === b.id ? '…' : 'Appliquer'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteBooking(b.id, b.name); }}
+                      disabled={deletingId === b.id}
+                      className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
+                      title="Supprimer le booking"
+                      aria-label="Supprimer"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -822,7 +833,7 @@ export default function WorkAllocation() {
       )}
 
       <DndContext
-        sensors={sensors}
+        sensors={user?.canEdit ? sensors : []}
         collisionDetection={pointerWithin}
         onDragStart={wrapDragStart(handleDragStart)}
         onDragEnd={wrapDragEnd(handleDragEnd)}

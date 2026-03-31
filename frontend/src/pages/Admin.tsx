@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import apiClient from '../api/client';
-import { Worker, Post } from '../types';
+import { Worker, Post, Manager } from '../types';
 import CreateWorkerModal from '../components/CreateWorkerModal';
 import CreatePostModal from '../components/CreatePostModal';
+import { useAuthStore } from '../store/useAuthStore';
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;
@@ -87,14 +88,21 @@ export default function Admin() {
     preRetraiteDay: '',
   });
 
-  const [accountForm, setAccountForm] = useState<{ username: string; password: string; confirmPassword: string }>({
+  const [accountForm, setAccountForm] = useState({
     username: '',
     password: '',
     confirmPassword: '',
+    canEdit: true,
+    canPrint: true,
+    canCreateAccounts: true,
   });
   const [accountMessage, setAccountMessage] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [isLoadingManagers, setIsLoadingManagers] = useState(false);
+
+  const { user } = useAuthStore();
 
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState<{
@@ -113,6 +121,23 @@ export default function Admin() {
     fetchWorkers();
     fetchPosts();
   }, [fetchWorkers, fetchPosts]);
+
+  const fetchManagers = async () => {
+    if (!user?.canCreateAccounts) return;
+    setIsLoadingManagers(true);
+    try {
+      const response = await apiClient.get<Manager[]>('/auth');
+      setManagers(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch managers:', err);
+    } finally {
+      setIsLoadingManagers(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchManagers();
+  }, [user?.canCreateAccounts]);
 
   const filteredWorkers = useMemo(() => {
     const q = workerSearch.trim().toLowerCase();
@@ -246,15 +271,29 @@ export default function Admin() {
       const response = await apiClient.post('/auth/register', {
         username: accountForm.username,
         password: accountForm.password,
+        canEdit: accountForm.canEdit,
+        canPrint: accountForm.canPrint,
+        canCreateAccounts: accountForm.canCreateAccounts,
       });
       setAccountMessage(response.data.message || 'Compte créé avec succès.');
-      setAccountForm({ username: '', password: '', confirmPassword: '' });
+      setAccountForm({
+        username: '',
+        password: '',
+        confirmPassword: '',
+        canEdit: true,
+        canPrint: true,
+        canCreateAccounts: true,
+      });
       setTimeout(() => setAccountMessage(''), 8000);
     } catch (e: any) {
       const msg = e?.response?.data?.error || e?.message || 'Erreur lors de la création du compte';
       setError(msg);
     } finally {
       setLoading(false);
+    }
+    // Refresh manager list if creation was successful
+    if (!error) {
+      fetchManagers();
     }
   };
 
@@ -278,13 +317,15 @@ export default function Admin() {
             onChange={(e) => setWorkerSearch(e.target.value)}
             className="flex-1 min-w-[200px] px-3 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
-          <button
-            type="button"
-            onClick={() => setShowWorkerModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            Créer Travailleur
-          </button>
+          {user?.canEdit && (
+            <button
+              type="button"
+              onClick={() => setShowWorkerModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              Créer Travailleur
+            </button>
+          )}
         </div>
         <div className="overflow-x-auto bg-white rounded-xl shadow-md border border-gray-200">
           <table className="min-w-full text-sm">
@@ -411,20 +452,24 @@ export default function Admin() {
                       </>
                     ) : (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => startEditWorker(w)}
-                          className="px-3 py-1 text-xs font-medium rounded-md border border-gray-300 text-blue-600 hover:bg-blue-50 transition-colors"
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => confirmDeleteWorker(w)}
-                          className="px-3 py-1 text-xs font-medium rounded-md bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all border border-red-100"
-                        >
-                          Supprimer
-                        </button>
+                        {user?.canEdit && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => startEditWorker(w)}
+                              className="px-3 py-1 text-xs font-medium rounded-md border border-gray-300 text-blue-600 hover:bg-blue-50 transition-colors"
+                            >
+                              Modifier
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => confirmDeleteWorker(w)}
+                              className="px-3 py-1 text-xs font-medium rounded-md bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all border border-red-100"
+                            >
+                              Supprimer
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                   </td>
@@ -453,13 +498,15 @@ export default function Admin() {
             onChange={(e) => setPostSearch(e.target.value)}
             className="flex-1 min-w-[200px] px-3 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
           />
-          <button
-            type="button"
-            onClick={() => setShowPostModal(true)}
-            className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors shadow-sm"
-          >
-            Créer Poste
-          </button>
+          {user?.canEdit && (
+            <button
+              type="button"
+              onClick={() => setShowPostModal(true)}
+              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors shadow-sm"
+            >
+              Créer Poste
+            </button>
+          )}
         </div>
         <div className="overflow-x-auto bg-white rounded-xl shadow-md border border-gray-200">
           <table className="min-w-full text-sm">
@@ -516,20 +563,24 @@ export default function Admin() {
                       </>
                     ) : (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => startEditPost(p)}
-                          className="px-3 py-1 text-xs font-medium rounded-md border border-gray-300 text-green-600 hover:bg-green-50 transition-colors"
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => confirmDeletePost(p)}
-                          className="px-3 py-1 text-xs font-medium rounded-md bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all border border-red-100"
-                        >
-                          Supprimer
-                        </button>
+                        {user?.canEdit && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => startEditPost(p)}
+                              className="px-3 py-1 text-xs font-medium rounded-md border border-gray-300 text-green-600 hover:bg-green-50 transition-colors"
+                            >
+                              Modifier
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => confirmDeletePost(p)}
+                              className="px-3 py-1 text-xs font-medium rounded-md bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all border border-red-100"
+                            >
+                              Supprimer
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                   </td>
@@ -548,97 +599,238 @@ export default function Admin() {
       </section>
 
       {/* Accounts management */}
-      <section>
-        <h2 className="text-xl font-semibold text-gray-800 mb-3">Comptes (Managers)</h2>
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-lg">
-          <p className="text-sm text-gray-600 mb-6">
-            Créez un nouveau compte manager en définissant un identifiant et un mot de passe.
-          </p>
+      {user?.canCreateAccounts && (
+        <section>
+          <h2 className="text-xl font-semibold text-gray-800 mb-3">Comptes (Managers)</h2>
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-lg">
+            <p className="text-sm text-gray-600 mb-6">
+              Créez un nouveau compte manager en définissant un identifiant et un mot de passe.
+            </p>
 
-          {accountMessage && (
-            <div className="mb-4 p-4 rounded-lg bg-green-50 text-green-800 text-sm border border-green-100 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4.006-5.503Z" clipRule="evenodd" />
-              </svg>
-              {accountMessage}
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-4 p-4 rounded-lg bg-red-50 text-red-800 text-sm border border-red-100 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-red-400">
-                <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z" clipRule="evenodd" />
-              </svg>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleCreateAccount} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Nom d'utilisateur <span className="text-red-500 font-normal">*</span>
-              </label>
-              <input
-                type="text"
-                value={accountForm.username}
-                onChange={(e) => setAccountForm((f) => ({ ...f, username: e.target.value }))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
-                placeholder="Ex: jdoe"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Mot de passe <span className="text-red-500 font-normal">*</span>
-                </label>
-                <input
-                  type="password"
-                  value={accountForm.password}
-                  onChange={(e) => setAccountForm((f) => ({ ...f, password: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
-                  placeholder="••••••••"
-                  required
-                  minLength={6}
-                />
+            {accountMessage && (
+              <div className="mb-4 p-4 rounded-lg bg-green-50 text-green-800 text-sm border border-green-100 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4.006-5.503Z" clipRule="evenodd" />
+                </svg>
+                {accountMessage}
               </div>
+            )}
 
+            {error && (
+              <div className="mb-4 p-4 rounded-lg bg-red-50 text-red-800 text-sm border border-red-100 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-red-400">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z" clipRule="evenodd" />
+                </svg>
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateAccount} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Confirmer le mot de passe <span className="text-red-500 font-normal">*</span>
+                  Nom d'utilisateur <span className="text-red-500 font-normal">*</span>
                 </label>
                 <input
-                  type="password"
-                  value={accountForm.confirmPassword}
-                  onChange={(e) => setAccountForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                  type="text"
+                  value={accountForm.username}
+                  onChange={(e) => setAccountForm((f) => ({ ...f, username: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
-                  placeholder="••••••••"
+                  placeholder="Ex: jdoe"
                   required
                 />
               </div>
-            </div>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full md:w-auto px-6 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200 transition-all active:scale-95"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Mot de passe <span className="text-red-500 font-normal">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={accountForm.password}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, password: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Confirmer le mot de passe <span className="text-red-500 font-normal">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={accountForm.confirmPassword}
+                    onChange={(e) => setAccountForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-3 border-b pb-2">
+                  Permissions du compte
+                </label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      id="perm-view"
+                      checked={true}
+                      disabled
+                      className="h-4 w-4 bg-gray-100 border-gray-300 rounded text-gray-400"
+                    />
+                    <div>
+                      <label htmlFor="perm-view" className="text-sm font-medium text-gray-600 block">Consultation (Défaut)</label>
+                      <span className="text-[10px] text-gray-400">Permet de voir les plans et la liste des travailleurs.</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      id="perm-edit"
+                      checked={accountForm.canEdit}
+                      onChange={(e) => setAccountForm(f => ({ ...f, canEdit: e.target.checked }))}
+                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <label htmlFor="perm-edit" className="text-sm font-bold text-gray-700 block">Édition & Modification</label>
+                      <span className="text-[10px] text-gray-500">Autorise la création de plans, l'assignation et la gestion des travailleurs.</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      id="perm-print"
+                      checked={accountForm.canPrint}
+                      onChange={(e) => setAccountForm(f => ({ ...f, canPrint: e.target.checked }))}
+                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <label htmlFor="perm-print" className="text-sm font-bold text-gray-700 block">Impression & Export</label>
+                      <span className="text-[10px] text-gray-500">Autorise l'impression des plans et l'exportation des données.</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      id="perm-create"
+                      checked={accountForm.canCreateAccounts}
+                      onChange={(e) => setAccountForm(f => ({ ...f, canCreateAccounts: e.target.checked }))}
+                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <label htmlFor="perm-create" className="text-sm font-bold text-gray-700 block">Gestion des comptes</label>
+                      <span className="text-[10px] text-gray-500">Autorise la création et la gestion d'autres comptes manager.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full md:w-auto px-6 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200 transition-all active:scale-95"
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Création en cours...
+                    </span>
+                  ) : 'Créer le compte'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* New Managers List Table */}
+          <div className="mt-8">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Comptes existants</h3>
+              <button 
+                onClick={fetchManagers}
+                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Actualiser la liste"
               >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Création en cours...
-                  </span>
-                ) : 'Créer le compte'}
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isLoadingManagers ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
               </button>
             </div>
-          </form>
-        </div>
-      </section>
+            
+            <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Utilisateur</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Modification</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Impression</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Comptes</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Rôle</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {isLoadingManagers ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-gray-400 italic">Chargement...</td>
+                    </tr>
+                  ) : managers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-gray-400 italic">Aucun compte trouvé</td>
+                    </tr>
+                  ) : (
+                    managers.map((m) => (
+                      <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px] uppercase">
+                              {m.username.substring(0, 2)}
+                            </div>
+                            <span className="font-medium text-gray-900">{m.username}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${m.canEdit ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {m.canEdit ? 'Oui' : 'Non'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${m.canPrint ? 'bg-indigo-100 text-indigo-700' : 'bg-red-100 text-red-700'}`}>
+                            {m.canPrint ? 'Oui' : 'Non'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${m.canCreateAccounts ? 'bg-purple-100 text-purple-700' : 'bg-red-100 text-red-700'}`}>
+                            {m.canCreateAccounts ? 'Oui' : 'Non'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          {user?.username === m.username ? (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold uppercase">Moi</span>
+                          ) : (
+                            <span className="text-xs text-gray-400">Manager</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
 
       {showWorkerModal && (
         <CreateWorkerModal onClose={() => setShowWorkerModal(false)} posts={posts} />

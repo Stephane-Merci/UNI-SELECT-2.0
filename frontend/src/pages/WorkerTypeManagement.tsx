@@ -16,12 +16,15 @@ import { useAutoScrollDuringDrag } from '../hooks/useAutoScrollDuringDrag';
 import { Worker, WorkerType, WorkerTypeLabels, WorkerTypeColors } from '../types';
 import WorkerTypeColumn from '../components/WorkerTypeColumn';
 import { io } from 'socket.io-client';
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function WorkerTypeManagement() {
   const { workers, updateWorkerType, fetchWorkers } = useStore();
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);
   const [pendingUpdate, setPendingUpdate] = useState<{ workerId: string; targetType: WorkerType } | null>(null);
   const [absenceEndDate, setAbsenceEndDate] = useState<string>('');
+
+  const { user } = useAuthStore();
 
   const ABSENCE_TYPES = [
     WorkerType.ABSENT,
@@ -62,6 +65,7 @@ export default function WorkerTypeManagement() {
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!user?.canEdit) return;
     const { active, over } = event;
     setActiveWorker(null);
 
@@ -175,15 +179,17 @@ export default function WorkerTypeManagement() {
                     {worker.absenceEndDate ? new Date(worker.absenceEndDate).toLocaleDateString('fr-FR') : 'Non définie'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button 
-                      onClick={() => {
-                        setPendingUpdate({ workerId: worker.id, targetType: worker.type });
-                        setAbsenceEndDate(worker.absenceEndDate ? new Date(worker.absenceEndDate).toISOString().split('T')[0] : '');
-                      }}
-                      className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
-                    >
-                      Modifier le retour
-                    </button>
+                    {user?.canEdit && (
+                      <button 
+                        onClick={() => {
+                          setPendingUpdate({ workerId: worker.id, targetType: worker.type });
+                          setAbsenceEndDate(worker.absenceEndDate ? new Date(worker.absenceEndDate).toISOString().split('T')[0] : '');
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
+                      >
+                        Modifier le retour
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -200,7 +206,7 @@ export default function WorkerTypeManagement() {
       </div>
 
       <DndContext
-        sensors={sensors}
+        sensors={user?.canEdit ? sensors : []}
         collisionDetection={closestCenter}
         onDragStart={wrapDragStart(handleDragStart)}
         onDragEnd={wrapDragEnd(handleDragEnd)}
