@@ -104,6 +104,17 @@ export default function Admin() {
 
   const { user } = useAuthStore();
 
+  const [editingManagerUsername, setEditingManagerUsername] = useState<string | null>(null);
+  const [editManagerPermissions, setEditManagerPermissions] = useState<{
+    canEdit: boolean;
+    canPrint: boolean;
+    canCreateAccounts: boolean;
+  }>({
+    canEdit: false,
+    canPrint: false,
+    canCreateAccounts: false,
+  });
+
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
@@ -272,6 +283,30 @@ export default function Admin() {
       await fetchManagers();
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'Erreur lors de la suppression du compte');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditingManager = (manager: Manager) => {
+    setEditingManagerUsername(manager.username);
+    setEditManagerPermissions({
+      canEdit: manager.canEdit,
+      canPrint: manager.canPrint,
+      canCreateAccounts: manager.canCreateAccounts,
+    });
+  };
+
+  const submitManagerEdit = async () => {
+    if (!editingManagerUsername) return;
+    setLoading(true);
+    setError('');
+    try {
+      await apiClient.put(`/auth/${editingManagerUsername}`, editManagerPermissions);
+      await fetchManagers();
+      setEditingManagerUsername(null);
+    } catch (e: any) {
+      setError(e?.response?.data?.error || e?.message || 'Erreur lors de la modification des permissions');
     } finally {
       setLoading(false);
     }
@@ -823,36 +858,96 @@ export default function Admin() {
                           </div>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${m.canEdit ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {m.canEdit ? 'Oui' : 'Non'}
-                          </span>
+                          {editingManagerUsername === m.username ? (
+                            <input 
+                              type="checkbox"
+                              checked={editManagerPermissions.canEdit}
+                              onChange={(e) => setEditManagerPermissions(prev => ({ ...prev, canEdit: e.target.checked }))}
+                              className="h-4 w-4 text-blue-600 rounded cursor-pointer"
+                            />
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${m.canEdit ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              {m.canEdit ? 'Oui' : 'Non'}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${m.canPrint ? 'bg-indigo-100 text-indigo-700' : 'bg-red-100 text-red-700'}`}>
-                            {m.canPrint ? 'Oui' : 'Non'}
-                          </span>
+                          {editingManagerUsername === m.username ? (
+                            <input 
+                              type="checkbox"
+                              checked={editManagerPermissions.canPrint}
+                              onChange={(e) => setEditManagerPermissions(prev => ({ ...prev, canPrint: e.target.checked }))}
+                              className="h-4 w-4 text-blue-600 rounded cursor-pointer"
+                            />
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${m.canPrint ? 'bg-indigo-100 text-indigo-700' : 'bg-red-100 text-red-700'}`}>
+                              {m.canPrint ? 'Oui' : 'Non'}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${m.canCreateAccounts ? 'bg-purple-100 text-purple-700' : 'bg-red-100 text-red-700'}`}>
-                            {m.canCreateAccounts ? 'Oui' : 'Non'}
-                          </span>
+                          {editingManagerUsername === m.username ? (
+                            <input 
+                              type="checkbox"
+                              checked={editManagerPermissions.canCreateAccounts}
+                              onChange={(e) => setEditManagerPermissions(prev => ({ ...prev, canCreateAccounts: e.target.checked }))}
+                              disabled={user?.username === m.username} // Cannot uncheck own admin perm
+                              className="h-4 w-4 text-blue-600 rounded cursor-pointer disabled:opacity-30"
+                            />
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${m.canCreateAccounts ? 'bg-purple-100 text-purple-700' : 'bg-red-100 text-red-700'}`}>
+                              {m.canCreateAccounts ? 'Oui' : 'Non'}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-4 text-right flex items-center justify-end gap-2">
-                          {user?.username === m.username ? (
-                            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold uppercase">Moi</span>
+                          {editingManagerUsername === m.username ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={submitManagerEdit}
+                                disabled={loading}
+                                className="px-2 py-1 bg-blue-600 text-white text-[10px] font-bold rounded hover:bg-blue-700"
+                              >
+                                {loading ? '...' : 'OK'}
+                              </button>
+                              <button
+                                onClick={() => setEditingManagerUsername(null)}
+                                className="px-2 py-1 bg-gray-100 text-gray-700 text-[10px] font-bold rounded hover:bg-gray-200"
+                              >
+                                X
+                              </button>
+                            </div>
                           ) : (
                             <>
-                              <span className="text-xs text-gray-400">Manager</span>
+                              {user?.username === m.username ? (
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold uppercase mr-2">Moi</span>
+                              ) : (
+                                <span className="text-xs text-gray-400 mr-2">Manager</span>
+                              )}
+                              
                               <button
                                 type="button"
-                                onClick={() => confirmDeleteManager(m)}
-                                className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                title="Supprimer ce compte"
+                                onClick={() => startEditingManager(m)}
+                                className="p-1 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                title="Modifier les permissions"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
                               </button>
+
+                              {user?.username !== m.username && (
+                                <button
+                                  type="button"
+                                  onClick={() => confirmDeleteManager(m)}
+                                  className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Supprimer ce compte"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              )}
                             </>
                           )}
                         </td>
