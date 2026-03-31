@@ -194,7 +194,7 @@ router.patch('/:id/type', async (req, res) => {
       return res.status(404).json({ error: 'Worker not found' });
     }
 
-    const ABSENCE_TYPES = [
+    const ABSENCE_TYPES: WorkerType[] = [
       WorkerType.ABSENT,
       WorkerType.VACANCES,
       WorkerType.LIBERATION_EXTERNE,
