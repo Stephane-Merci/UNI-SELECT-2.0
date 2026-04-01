@@ -58,6 +58,8 @@ interface AppState {
   workerPresences: WorkerPresence[];
   /** Bump to force re-render when plan layout (order/lock) changes. */
   planLayoutVersion: Record<string, number>;
+  isFullScreen: boolean;
+  setFullScreen: (isFullScreen: boolean) => void;
   loading: boolean;
   error: string | null;
 
@@ -99,6 +101,8 @@ export const useStore = create<AppState>((set, get) => ({
   assignments: [],
   workerPresences: [],
   planLayoutVersion: {},
+  isFullScreen: false,
+  setFullScreen: (isFullScreen) => set({ isFullScreen }),
   loading: false,
   error: null,
 

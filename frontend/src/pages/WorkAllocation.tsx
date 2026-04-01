@@ -170,6 +170,8 @@ export default function WorkAllocation() {
     getPlanLockedPosts,
     togglePlanPostLock,
     planLayoutVersion,
+    isFullScreen,
+    setFullScreen,
   } = useStore();
 
   const { user } = useAuthStore();
@@ -688,8 +690,8 @@ export default function WorkAllocation() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+    <div className={isFullScreen ? 'p-2' : 'p-6'}>
+      <div className={`flex justify-between items-center ${isFullScreen ? 'mb-2' : 'mb-6'} flex-wrap gap-4`}>
         <h1 className="text-3xl font-bold text-gray-900">Booking</h1>
         <div className="flex items-center gap-2 flex-wrap">
           {user?.canEdit && canUndo && (
@@ -759,16 +761,42 @@ export default function WorkAllocation() {
               Voir remplacements
             </Link>
           )}
+          <button
+            type="button"
+            onClick={() => setFullScreen(!isFullScreen)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium border rounded-md transition-all ${isFullScreen 
+              ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 shadow-sm' 
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+            title={isFullScreen ? "Quitter le plein écran" : "Passer en plein écran"}
+          >
+            {isFullScreen ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Quitter
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+                Plein Écran
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      <p className="text-sm text-gray-600 mb-4">
-        {inMeeting
-          ? 'Réunion en cours : répartissez les travailleurs par zone, puis Sauvegarder le booking pour enregistrer. Vous pourrez sélectionner et appliquer un booking plus tard dans la liste.'
-          : 'Répartition actuelle par zone originelle. Cliquez sur Commencer le booking pour lancer une réunion, puis Sauvegarder le booking. Sélectionnez un booking dans la liste et cliquez sur Appliquer pour l\'activer.'}
-      </p>
+      {!isFullScreen && (
+        <p className="text-sm text-gray-600 mb-4">
+          {inMeeting
+            ? 'Réunion en cours : répartissez les travailleurs par zone, puis Sauvegarder le booking pour enregistrer. Vous pourrez sélectionner et appliquer un booking plus tard dans la liste.'
+            : 'Répartition actuelle par zone originelle. Cliquez sur Commencer le booking pour lancer une réunion, puis Sauvegarder le booking. Sélectionnez un booking dans la liste et cliquez sur Appliquer pour l\'activer.'}
+        </p>
+      )}
 
-      {bookings.length > 0 && (
+      {bookings.length > 0 && !isFullScreen && (
         <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Bookings enregistrés</h2>
           <div className="flex flex-wrap gap-2">
@@ -838,7 +866,7 @@ export default function WorkAllocation() {
         onDragStart={wrapDragStart(handleDragStart)}
         onDragEnd={wrapDragEnd(handleDragEnd)}
       >
-        <div className={`flex gap-4 h-[calc(100vh-220px)] min-h-[400px] ${replacementPostId ? '' : ''}`}>
+        <div className={`flex gap-4 ${isFullScreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(100vh-220px)]'} min-h-[400px] ${replacementPostId ? '' : ''}`}>
           <div className="flex-1 min-w-0 overflow-y-auto">
             <SortableContext
               items={orderedPosts.filter((p) => !lockedPostIds.has(p.id)).map((p) => `${POST_COLUMN_DRAG_PREFIX}${p.id}`)}

@@ -279,6 +279,8 @@ function PostsPanel({
   onDeleteUnfilled,
   shiftFilter,
   onShiftFilterChange,
+  isFullScreen,
+  onToggleFullScreen,
 }: {
   posts: Post[];
   workers: Worker[];
@@ -292,6 +294,8 @@ function PostsPanel({
   onDeleteUnfilled: (id: string) => void;
   shiftFilter: 'jour' | 'soir' | 'tous';
   onShiftFilterChange: (s: 'jour' | 'soir' | 'tous') => void;
+  isFullScreen: boolean;
+  onToggleFullScreen: () => void;
 }) {
   const getWorkersForPost = (postId: string) => {
     return workers
@@ -340,6 +344,30 @@ function PostsPanel({
             Tous
           </button>
         </div>
+        <button
+          type="button"
+          onClick={onToggleFullScreen}
+          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium border rounded-md transition-all ${isFullScreen 
+            ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 shadow-sm' 
+            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+          title={isFullScreen ? "Quitter le plein écran" : "Passer en plein écran"}
+        >
+          {isFullScreen ? (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Quitter
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+              Plein Écran
+            </>
+          )}
+        </button>
       </div>
       <div className="flex-1 overflow-y-auto">
         <SortableContext
@@ -392,6 +420,8 @@ export default function PlanManagement() {
     addUnfilledPosition,
     deleteUnfilledPosition,
     updateWorkerType,
+    isFullScreen,
+    setFullScreen,
   } = useStore();
 
   // Ordered posts for current plan (persisted in localStorage); re-render when layout changes
@@ -1064,7 +1094,7 @@ export default function PlanManagement() {
   };
 
   return (
-    <div className="h-screen w-full flex flex-col bg-gray-50">
+    <div className={`w-full flex flex-col bg-gray-50 ${isFullScreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(100vh-130px)]'}`}>
       {/* Header */}
       <div className="bg-white shadow-sm border-b px-6 py-4">
         <div className="flex justify-between items-center">
@@ -1141,11 +1171,11 @@ export default function PlanManagement() {
           onDragStart={wrapDragStart(handleDragStart)}
           onDragEnd={wrapDragEnd(handleDragEnd)}
         >
-          <div className="flex-1 flex p-6 overflow-hidden gap-4 resizable-container">
+          <div className={`flex-1 flex overflow-hidden gap-4 resizable-container ${isFullScreen ? 'p-2' : 'p-6 pt-0'}`}>
             {/* Left Panel - Posts */}
             <div
               className="bg-white rounded-lg shadow p-4 overflow-hidden"
-              style={{ width: `${leftPanelWidth}%`, minWidth: '300px' }}
+              style={{ width: isFullScreen ? '100%' : `${leftPanelWidth}%`, minWidth: isFullScreen ? '100%' : '300px' }}
             >
               <PostsPanel
                 posts={orderedPosts}
@@ -1160,53 +1190,59 @@ export default function PlanManagement() {
                 onDeleteUnfilled={deleteUnfilledPosition}
                 shiftFilter={shiftFilter}
                 onShiftFilterChange={setShiftFilter}
+                isFullScreen={isFullScreen}
+                onToggleFullScreen={() => setFullScreen(!isFullScreen)}
               />
             </div>
 
-            {/* Resizer with Lock */}
-            <div className="flex flex-col items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsResizeLocked(!isResizeLocked)}
-                className={`p-1.5 rounded-full shadow-sm border transition-all z-10 ${isResizeLocked
-                  ? 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'
-                  : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                  }`}
-                title={isResizeLocked ? "Déverrouiller le redimensionnement" : "Verrouiller le redimensionnement"}
-              >
-                {isResizeLocked ? (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2H7V7a3 3 0 016 0 3 3 0 013 3 1 1 0 002 0 5 5 0 00-5-5z" />
-                  </svg>
-                )}
-              </button>
-              <div
-                onMouseDown={handleMouseDown}
-                className={`w-1 flex-1 bg-gray-300 transition-colors ${isResizeLocked
-                  ? 'cursor-not-allowed opacity-50'
-                  : 'hover:bg-blue-500 cursor-col-resize'
-                  } ${isResizing ? 'bg-blue-500' : ''}`}
-                style={{ minWidth: '4px' }}
-              />
-            </div>
+            {!isFullScreen && (
+              <>
+                {/* Resizer with Lock */}
+                <div className="flex flex-col items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsResizeLocked(!isResizeLocked)}
+                    className={`p-1.5 rounded-full shadow-sm border transition-all z-10 ${isResizeLocked
+                      ? 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'
+                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    title={isResizeLocked ? "Déverrouiller le redimensionnement" : "Verrouiller le redimensionnement"}
+                  >
+                    {isResizeLocked ? (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2H7V7a3 3 0 016 0 3 3 0 013 3 1 1 0 002 0 5 5 0 00-5-5z" />
+                      </svg>
+                    )}
+                  </button>
+                  <div
+                    onMouseDown={handleMouseDown}
+                    className={`w-1 flex-1 bg-gray-300 transition-colors ${isResizeLocked
+                      ? 'cursor-not-allowed opacity-50'
+                      : 'hover:bg-blue-500 cursor-col-resize'
+                      } ${isResizing ? 'bg-blue-500' : ''}`}
+                    style={{ minWidth: '4px' }}
+                  />
+                </div>
 
-            {/* Right Panel - Presence */}
-            <div
-              className="bg-white rounded-lg shadow p-4 overflow-hidden flex-1"
-              style={{ minWidth: '300px' }}
-            >
-              <PresencePanel
-                workers={workersForPresencePanel}
-                presences={presenceMap}
-                searchFilter={presenceSearchFilter}
-                onSearchChange={setPresenceSearchFilter}
-                onAutoClick={handleAutoAssign}
-              />
-            </div>
+                {/* Right Panel - Presence */}
+                <div
+                  className="bg-white rounded-lg shadow p-4 overflow-hidden flex-1"
+                  style={{ minWidth: '300px' }}
+                >
+                  <PresencePanel
+                    workers={workersForPresencePanel}
+                    presences={presenceMap}
+                    searchFilter={presenceSearchFilter}
+                    onSearchChange={setPresenceSearchFilter}
+                    onAutoClick={handleAutoAssign}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <DragOverlay>
