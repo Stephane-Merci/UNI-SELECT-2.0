@@ -199,7 +199,8 @@ router.patch('/:id/type', async (req, res) => {
       WorkerType.VACANCES,
       WorkerType.LIBERATION_EXTERNE,
       WorkerType.INVALIDITE,
-      WorkerType.CONGE_PARENTAL
+      WorkerType.CONGE_PARENTAL,
+      WorkerType.TRAVAIL_LEGER
     ];
 
     const wasAbsent = ABSENCE_TYPES.includes(worker.type);

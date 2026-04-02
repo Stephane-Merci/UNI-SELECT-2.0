@@ -10,6 +10,7 @@ import Documentation from './pages/Documentation';
 import Login from './pages/Login';
 import { useAuthStore } from './store/useAuthStore';
 import PremiumState from './pages/PremiumState';
+import AbsenceConsultation from './pages/AbsenceConsultation';
 
 function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
@@ -48,6 +49,12 @@ function App() {
           element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
         >
           <Route index element={<WorkerTypeManagement />} />
+        </Route>
+        <Route
+          path="/absence-consultation"
+          element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
+        >
+          <Route index element={<AbsenceConsultation />} />
         </Route>
         <Route
           path="/documentation"

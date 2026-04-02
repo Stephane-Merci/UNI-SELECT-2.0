@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   DndContext,
   DragOverlay,
@@ -31,7 +32,8 @@ export default function WorkerTypeManagement() {
     WorkerType.VACANCES,
     WorkerType.LIBERATION_EXTERNE,
     WorkerType.INVALIDITE,
-    WorkerType.CONGE_PARENTAL
+    WorkerType.CONGE_PARENTAL,
+    WorkerType.TRAVAIL_LEGER
   ];
 
   const sensors = useSensors(
@@ -125,84 +127,19 @@ export default function WorkerTypeManagement() {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">
-        Gestion des Types de Travailleurs
-      </h1>
-
-      {/* Absences summary section */}
-      <div className="mb-10 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="bg-slate-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Consultation des Absences & Congés
-          </h2>
-          <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-1 rounded-full uppercase">
-            {workers.filter(w => ABSENCE_TYPES.includes(w.type)).length} Travailleurs
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Travailleur</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Parti le</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Retour prévu le</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {workers.filter(w => ABSENCE_TYPES.includes(w.type)).map(worker => (
-                <tr key={worker.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
-                        {worker.anciennete}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-semibold text-gray-900">{worker.name}</div>
-                        <div className="text-xs text-gray-500">{worker.originalPost?.name || 'Sans poste'}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2.5 py-1 rounded-md text-xs font-bold text-white uppercase shadow-sm" style={{ backgroundColor: WorkerTypeColors[worker.type] }}>
-                      {WorkerTypeLabels[worker.type]}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {worker.absenceStartDate ? new Date(worker.absenceStartDate).toLocaleDateString('fr-FR') : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600">
-                    {worker.absenceEndDate ? new Date(worker.absenceEndDate).toLocaleDateString('fr-FR') : 'Non définie'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {user?.canEdit && (
-                      <button 
-                        onClick={() => {
-                          setPendingUpdate({ workerId: worker.id, targetType: worker.type });
-                          setAbsenceEndDate(worker.absenceEndDate ? new Date(worker.absenceEndDate).toISOString().split('T')[0] : '');
-                        }}
-                        className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors"
-                      >
-                        Modifier le retour
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {workers.filter(w => ABSENCE_TYPES.includes(w.type)).length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-gray-500 italic">
-                    Aucun travailleur en absence ou congé actuellement.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Gestion des Types de Travailleurs
+        </h1>
+        <Link 
+          to="/absence-consultation"
+          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2 transform hover:-translate-y-0.5 active:translate-y-0"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Consultation des Absences
+        </Link>
       </div>
 
       <DndContext

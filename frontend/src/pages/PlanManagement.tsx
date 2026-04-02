@@ -48,8 +48,18 @@ const ATTENDANCE_PRESENCE_GROUPS: Record<string, WorkerType[]> = {
   'Invalidité': [WorkerType.INVALIDITE],
   'Congé parental': [WorkerType.CONGE_PARENTAL],
   'Préretraite': [WorkerType.PRERETRAITE],
+  'Travail léger': [WorkerType.TRAVAIL_LEGER],
 };
-const ATTENDANCE_PRESENCE_TYPES = new Set(Object.values(ATTENDANCE_PRESENCE_GROUPS).flat());
+const ATTENDANCE_PRESENCE_TYPES = new Set([
+  WorkerType.ABSENT,
+  WorkerType.VACANCES,
+  WorkerType.LIBERATION_EXTERNE,
+  WorkerType.INVALIDITE,
+  WorkerType.CONGE_PARENTAL,
+  // Travail léger is NOT in this set because they can be assigned to posts.
+  // Pré-retraite is normally handled by date logic, but usually they are not assignable.
+  WorkerType.PRERETRAITE
+]);
 
 // Single presence box — useDroppable must be called at top level (not inside map).
 function PresenceBox({
@@ -1470,10 +1480,11 @@ export default function PlanManagement() {
                   <option value={WorkerType.INVALIDITE}>Invalidité (Prolonger)</option>
                   <option value={WorkerType.LIBERATION_EXTERNE}>Libération externe (Prolonger)</option>
                   <option value={WorkerType.CONGE_PARENTAL}>Congé parental (Prolonger)</option>
+                  <option value={WorkerType.TRAVAIL_LEGER}>Travail léger (Fixer durée)</option>
                 </select>
               </div>
 
-              {[WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE, WorkerType.LIBERATION_EXTERNE, WorkerType.CONGE_PARENTAL].includes(returningWorkerPrompt.newType) && (
+              {[WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE, WorkerType.LIBERATION_EXTERNE, WorkerType.CONGE_PARENTAL, WorkerType.TRAVAIL_LEGER].includes(returningWorkerPrompt.newType) && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                     Nouvelle date de fin
@@ -1492,7 +1503,7 @@ export default function PlanManagement() {
             <div className="flex justify-end gap-3 mt-8">
               <button
                 onClick={async () => {
-                  const isAbsence = [WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE, WorkerType.LIBERATION_EXTERNE, WorkerType.CONGE_PARENTAL].includes(returningWorkerPrompt.newType);
+                  const isAbsence = [WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE, WorkerType.LIBERATION_EXTERNE, WorkerType.CONGE_PARENTAL, WorkerType.TRAVAIL_LEGER].includes(returningWorkerPrompt.newType);
                   const endDate = isAbsence ? returningWorkerPrompt.newEndDate : null;
 
                   if (isAbsence && !endDate) return; // Require date for extension

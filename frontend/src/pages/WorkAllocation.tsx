@@ -66,6 +66,7 @@ function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: stri
               worker={worker}
               dragId={postId ? `${POST_DRAG_PREFIX}${postId}${POST_DRAG_SEP}${worker.id}` : undefined}
               currentPostId={postId}
+              disableBlinking={true}
             />
           ))}
         </div>
@@ -153,6 +154,7 @@ function SortablePostColumnBooking({
         isLocked={isLocked}
         onLockToggle={onLockToggle}
         wrapperClassName={wrapperClass}
+        disableBlinking={true}
         dragHandleProps={isLocked ? undefined : { attributes: attributes as unknown as Record<string, unknown>, listeners: listeners as unknown as Record<string, unknown> }}
       />
     </div>

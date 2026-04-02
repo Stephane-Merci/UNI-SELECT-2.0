@@ -22,13 +22,16 @@ interface WorkerCardProps {
   dragId?: string;
   /** Currently assigned post id (to compare with originalPostId). */
   currentPostId?: string;
+  /** Force disable any blinking even if moved. */
+  disableBlinking?: boolean;
 }
 
 export default function WorkerCard({ 
   worker, 
   presenceType,
   dragId,
-  currentPostId
+  currentPostId,
+  disableBlinking
 }: WorkerCardProps) {
   const sortableId = dragId ?? worker.id;
   const {
@@ -47,10 +50,12 @@ export default function WorkerCard({
     WorkerType.VACANCES,
     WorkerType.LIBERATION_EXTERNE,
     WorkerType.INVALIDITE,
-    WorkerType.CONGE_PARENTAL
+    WorkerType.CONGE_PARENTAL,
+    WorkerType.TRAVAIL_LEGER
   ].includes(displayType);
 
   const isMoved = 
+    !disableBlinking &&
     currentPostId && 
     worker.originalPostId && 
     currentPostId !== worker.originalPostId && 
