@@ -70,11 +70,10 @@ router.post('/', async (req, res) => {
 
     if (existingAssignment) {
       const now = new Date();
-      // Try to update interaction history, but never fail the assignment if the
-      // interaction table/model is missing (e.g. local DB without migrations).
+      // Update interaction history
       try {
-        // Close current interaction for this worker in this plan (they're leaving current post)
-        await (prisma as any).assignmentInteraction?.updateMany?.({
+        // Close current interaction for this worker in this plan
+        await prisma.assignmentInteraction.updateMany({
           where: {
             planId: data.planId,
             workerId: data.workerId,
@@ -83,7 +82,7 @@ router.post('/', async (req, res) => {
           data: { endedAt: now },
         });
         // Open new interaction for the new post
-        await (prisma as any).assignmentInteraction?.create?.({
+        await prisma.assignmentInteraction.create({
           data: {
             planId: data.planId,
             workerId: data.workerId,
@@ -91,8 +90,8 @@ router.post('/', async (req, res) => {
             startedAt: now,
           },
         });
-      } catch {
-        // Ignore interaction logging errors so core assignment still works
+      } catch (err) {
+        console.error('Interaction logging error on update:', err);
       }
 
       const assignment = await prisma.assignment.update({
@@ -147,17 +146,17 @@ router.post('/', async (req, res) => {
       return res.json(assignment);
     }
 
-    // Create new assignment: log first interaction (if interaction model/table exists)
+    // Create new assignment: log first interaction
     try {
-      await (prisma as any).assignmentInteraction?.create?.({
+      await prisma.assignmentInteraction.create({
         data: {
           planId: data.planId,
           workerId: data.workerId,
           postId: data.postId,
         },
       });
-    } catch {
-      // Ignore interaction logging errors so assignment creation still succeeds
+    } catch (err) {
+      console.error('Interaction logging error on create:', err);
     }
 
     const assignment = await prisma.assignment.create({
@@ -226,11 +225,9 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Assignment not found' });
     }
 
-    // Close any open interaction for this worker in this plan (e.g. moved to absent).
-    // Do this defensively so lack of AssignmentInteraction table/model does not break undo.
     try {
       const now = new Date();
-      await (prisma as any).assignmentInteraction?.updateMany?.({
+      await prisma.assignmentInteraction.updateMany({
         where: {
           planId: assignment.planId,
           workerId: assignment.workerId,
@@ -238,8 +235,8 @@ router.delete('/:id', async (req, res) => {
         },
         data: { endedAt: now },
       });
-    } catch {
-      // Ignore interaction logging errors on delete
+    } catch (err) {
+      console.error('Interaction logging error on delete:', err);
     }
 
     await prisma.assignment.delete({

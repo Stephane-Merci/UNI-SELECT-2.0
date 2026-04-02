@@ -33,6 +33,7 @@ model Worker {
   bookingReplacements8 BookingReplacement[] @relation("Replacement8")
   originalPost         Post                 @relation("OriginalPost", fields: [originalPostId], references: [id])
   presences            WorkerPresence[]
+  interactions         AssignmentInteraction[]
 
   @@index([type])
   @@index([anciennete], map: "Worker_matricule_idx")
@@ -49,6 +50,7 @@ model Post {
   bookingReplacements BookingReplacement[]
   originalWorkers     Worker[]             @relation("OriginalPost")
   unfilledPositions   UnfilledPosition[]
+  interactions        AssignmentInteraction[]
 
   @@index([name])
 }
@@ -63,6 +65,7 @@ model Plan {
   assignments     Assignment[]
   workerPresences WorkerPresence[]
   unfilledPositions UnfilledPosition[]
+  interactions      AssignmentInteraction[]
 
   @@index([name])
   @@index([date])
@@ -181,6 +184,22 @@ model Manager {
 
   @@index([username])
   @@index([email])
+}
+
+model AssignmentInteraction {
+  id        String   @id @default(cuid())
+  planId    String
+  workerId  String
+  postId    String
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([workerId])
+  @@index([postId])
 }
 
 enum WorkerType {

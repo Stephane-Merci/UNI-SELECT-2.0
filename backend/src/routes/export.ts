@@ -1,8 +1,16 @@
 import express from 'express';
 import { prisma } from '../index';
 import * as XLSX from 'xlsx';
+import { WorkerType } from '../generated/prisma';
 
 const router = express.Router();
+
+const WORKER_TYPES_SOIR: WorkerType[] = [
+  WorkerType.SOIR,
+  WorkerType.PERMANENT_SOIR,
+  WorkerType.OCCASIONEL_SOIR,
+  WorkerType.MOBILITE_DU_SOIR
+];
 
 // Export workers to Excel
 router.get('/workers', async (req, res) => {
@@ -158,16 +166,14 @@ router.get('/plan/:id', async (req, res) => {
     }
 
     // Fetch interaction history (worker post migrations with start/end times)
-    let interactions: Array<{ workerId: string; postId: string; startedAt: Date; endedAt: Date | null; worker?: { anciennete: string; name: string } | null; post?: { name: string } | null }> = [];
+    let interactions: Array<{ workerId: string; postId: string; startedAt: Date; endedAt: Date | null; worker?: { anciennete: string; name: string; type: string } | null; post?: { name: string } | null }> = [];
     try {
-      if (typeof (prisma as any).assignmentInteraction?.findMany === 'function') {
-        const rows = await (prisma as any).assignmentInteraction.findMany({
-          where: { planId: plan.id },
-          include: { worker: { select: { anciennete: true, name: true } }, post: { select: { name: true } } },
-          orderBy: { startedAt: 'asc' },
-        });
-        interactions = Array.isArray(rows) ? rows : [];
-      }
+      const rows = await prisma.assignmentInteraction.findMany({
+        where: { planId: plan.id },
+        include: { worker: { select: { anciennete: true, name: true, type: true } }, post: { select: { name: true } } },
+        orderBy: { startedAt: 'asc' },
+      });
+      interactions = rows as any;
     } catch (_) {
       // Table or model may not exist; will fall back to assignment-based rows below
     }
@@ -279,25 +285,30 @@ router.get('/plan/:id', async (req, res) => {
         list.push(i);
         byWorker.set(i.workerId, list);
       }
+      const planDateDayOffset = plan.date ? new Date(plan.date) : new Date(plan.createdAt);
+
       for (const [, list] of byWorker) {
         list.sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
-        let totalPrevMs = 0;
         let seq = 0;
         for (const i of list) {
           workersWithInteractions.add(i.workerId);
           seq += 1;
           const start = new Date(i.startedAt);
           let end: Date;
-          let durationMs: number;
+
           if (i.endedAt) {
             end = new Date(i.endedAt);
-            durationMs = end.getTime() - start.getTime();
           } else {
-            const remainingMs = Math.max(0, EIGHT_HOURS_MS - totalPrevMs);
-            end = new Date(Math.min(start.getTime() + remainingMs, now.getTime()));
-            durationMs = end.getTime() - start.getTime();
+            // Find the shift end hour
+            const workerType = presenceByWorkerId.get(i.workerId) || (i.worker?.type as WorkerType);
+            const isNight = WORKER_TYPES_SOIR.includes(workerType as WorkerType);
+            const hourSet = isNight ? 21 : 15;
+            
+            end = new Date(planDateDayOffset);
+            end.setHours(hourSet, 0, 0, 0);
           }
-          totalPrevMs += durationMs;
+
+          const durationMs = end.getTime() - start.getTime();
           const workerInfo = i.worker ?? workerById.get(i.workerId);
           const postName = i.post?.name ?? postNameById.get(i.postId) ?? '';
           interactionRows.push({
@@ -313,20 +324,29 @@ router.get('/plan/:id', async (req, res) => {
       }
     } else {
       // No interaction history: derive one row per current assignment so the sheet has Début/Fin data
+      const planDateDayOffset = plan.date ? new Date(plan.date) : new Date(plan.createdAt);
       let seq = 0;
       for (const a of plan.assignments) {
         seq += 1;
         const workerInfo = workerById.get(a.workerId);
         const postName = a.post?.name ?? postNameById.get(a.postId) ?? '';
         const start = new Date(a.assignedAt);
+        
+        const workerType = presenceByWorkerId.get(a.workerId) || (a.worker?.type as WorkerType);
+        const isNight = WORKER_TYPES_SOIR.includes(workerType as WorkerType);
+        const hourSet = isNight ? 21 : 15;
+        const end = new Date(planDateDayOffset);
+        end.setHours(hourSet, 0, 0, 0);
+        const durationMs = Math.max(0, end.getTime() - start.getTime());
+
         interactionRows.push({
           Séquence: seq,
           Ancienneté: workerInfo?.anciennete ?? '',
           Nom: workerInfo?.name ?? '',
           Poste: postName,
           Début: formatTime(start),
-          Fin: formatTime(start),
-          'Durée (min)': 0,
+          Fin: formatTime(end),
+          'Durée (min)': Math.round(durationMs / 60000),
         });
         workersWithInteractions.add(a.workerId);
       }
