@@ -65,6 +65,7 @@ function UnassignedColumn({ workers, postId }: { workers: Worker[]; postId: stri
               key={worker.id}
               worker={worker}
               dragId={postId ? `${POST_DRAG_PREFIX}${postId}${POST_DRAG_SEP}${worker.id}` : undefined}
+              currentPostId={postId}
             />
           ))}
         </div>

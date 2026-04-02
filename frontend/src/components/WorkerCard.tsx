@@ -20,12 +20,15 @@ interface WorkerCardProps {
   presenceType?: WorkerType;
   /** Unique drag id when the same worker appears in multiple places (e.g. presence + post). */
   dragId?: string;
+  /** Currently assigned post id (to compare with originalPostId). */
+  currentPostId?: string;
 }
 
 export default function WorkerCard({ 
   worker, 
   presenceType,
-  dragId
+  dragId,
+  currentPostId
 }: WorkerCardProps) {
   const sortableId = dragId ?? worker.id;
   const {
@@ -39,6 +42,20 @@ export default function WorkerCard({
 
   const displayType = presenceType || worker.type;
   const typeColor = WorkerTypeColors[displayType];
+  const isAbsent = [
+    WorkerType.ABSENT,
+    WorkerType.VACANCES,
+    WorkerType.LIBERATION_EXTERNE,
+    WorkerType.INVALIDITE,
+    WorkerType.CONGE_PARENTAL
+  ].includes(displayType);
+
+  const isMoved = 
+    currentPostId && 
+    worker.originalPostId && 
+    currentPostId !== worker.originalPostId && 
+    // Don't blink if they are unassigned (in presence box) AND it's a normal absence group
+    !(currentPostId === 'presence' && isAbsent);
   
   const hexToRgba = (hex: string, alpha: number) => {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -58,13 +75,6 @@ export default function WorkerCard({
 
   const postName = worker.originalPost?.name ?? '-';
   const absenceEndDateStr = worker.absenceEndDate;
-  const isAbsent = [
-    WorkerType.ABSENT,
-    WorkerType.VACANCES,
-    WorkerType.LIBERATION_EXTERNE,
-    WorkerType.INVALIDITE,
-    WorkerType.CONGE_PARENTAL
-  ].includes(displayType);
 
   return (
     <div
@@ -72,7 +82,7 @@ export default function WorkerCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="rounded px-1 py-0.5 shadow-sm hover:shadow cursor-move border text-[10px] leading-tight w-[110px] max-w-full min-w-0 overflow-hidden"
+      className={`rounded px-1 py-0.5 shadow-sm hover:shadow cursor-move border text-[10px] leading-tight w-[110px] max-w-full min-w-0 overflow-hidden ${isMoved ? 'animate-worker-moved' : ''}`}
     >
       <div className="flex flex-col gap-px">
         <div className="font-medium text-gray-900 truncate">({worker.anciennete}) {worker.name}</div>

@@ -121,6 +121,7 @@ export default function PostColumn({
                 key={worker.id}
                 worker={worker}
                 dragId={`${POST_DRAG_PREFIX}${post.id}${POST_DRAG_SEP}${worker.id}`}
+                currentPostId={post.id}
               />
             ))}
             {unfilledPositions.map((up) => (
