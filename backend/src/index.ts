@@ -13,6 +13,7 @@ import exportRoutes from './routes/export';
 import authRoutes from './routes/auth';
 import healthRoutes from './routes/health';
 import bookingRoutes from './routes/bookings';
+import machineryRoutes from './routes/machinery';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use('/api/plans', planRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/machinery', machineryRoutes);
 
 // Socket.io for real-time collaboration
 io.on('connection', (socket) => {

@@ -9,6 +9,7 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
   const { createPost } = useStore();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [needsMachinery, setNeedsMachinery] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,6 +25,7 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
       await createPost({
         name,
         description: description || undefined,
+        needsMachinery,
       });
       onClose();
     } catch (err: any) {
@@ -33,10 +35,10 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-2xl">
         <h2 className="text-2xl font-bold mb-4">Créer un Poste</h2>
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-800 rounded">
+          <div className="mb-4 p-3 bg-red-50 text-red-800 rounded text-sm border border-red-100">
             {error}
           </div>
         )}
@@ -49,7 +51,7 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none"
               required
             />
           </div>
@@ -60,9 +62,22 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none"
               rows={3}
             />
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <input
+              type="checkbox"
+              id="needsMachinery"
+              checked={needsMachinery}
+              onChange={(e) => setNeedsMachinery(e.target.checked)}
+              className="h-5 w-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+            />
+            <div>
+              <label htmlFor="needsMachinery" className="text-sm font-bold text-gray-700 block">Requiert une Machinerie</label>
+              <span className="text-[10px] text-gray-500">Un checkup technique sera demandé au travailleur assigné.</span>
+            </div>
           </div>
           <div className="flex justify-end space-x-4">
             <button

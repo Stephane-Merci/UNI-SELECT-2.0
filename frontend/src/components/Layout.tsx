@@ -87,6 +87,13 @@ export default function Layout() {
                         Documentation
                       </Link>
                       <Link
+                        to="/machinery-checkup"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        Checkup Machinerie
+                      </Link>
+                      <Link
                         to="/admin"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setDropdownOpen(false)}

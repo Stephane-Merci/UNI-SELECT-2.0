@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Worker, Post, Assignment, WorkerType, Plan, WorkerPresence } from '../types';
+import { Worker, Post, Assignment, WorkerType, Plan, WorkerPresence, MachineryCheck } from '../types';
 import apiClient from '../api/client';
 
 const PLAN_POST_ORDER_KEY = 'plan-post-order';
@@ -62,6 +62,7 @@ interface AppState {
   setFullScreen: (isFullScreen: boolean) => void;
   loading: boolean;
   error: string | null;
+  machineryChecks: MachineryCheck[];
 
   getPlanPostOrder: (planId: string, postIds: string[]) => string[];
   setPlanPostOrder: (planId: string, order: string[]) => void;
@@ -91,6 +92,9 @@ interface AppState {
   addUnfilledPosition: (planId: string, postId: string) => Promise<void>;
   deleteUnfilledPosition: (unfilledPositionId: string) => Promise<void>;
   resetPlan: (planId: string) => Promise<void>;
+  fetchMachineryChecks: (planId: string) => Promise<void>;
+  updateMachineryCheck: (data: Omit<MachineryCheck, 'id' | 'checkedAt'>) => Promise<void>;
+  updatePostMachineryStatus: (postId: string, status: 'GOOD' | 'FAULTY' | 'UNKNOWN') => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -100,6 +104,7 @@ export const useStore = create<AppState>((set, get) => ({
   currentPlan: null,
   assignments: [],
   workerPresences: [],
+  machineryChecks: [],
   planLayoutVersion: {},
   isFullScreen: false,
   setFullScreen: (isFullScreen) => set({ isFullScreen }),
@@ -530,6 +535,37 @@ export const useStore = create<AppState>((set, get) => ({
     } catch (error: any) {
       set({ error: error.message, loading: false });
       throw error;
+    }
+  },
+  fetchMachineryChecks: async (planId) => {
+    try {
+      const response = await apiClient.get(`/machinery/plan/${planId}`);
+      set({ machineryChecks: response.data });
+    } catch (error: any) {
+      console.error('Failed to fetch machinery checks:', error);
+    }
+  },
+  updateMachineryCheck: async (data) => {
+    try {
+      const response = await apiClient.post('/machinery/check', data);
+      set((state) => {
+        const filtered = state.machineryChecks.filter(
+          (c) => !(c.planId === data.planId && c.postId === data.postId)
+        );
+        return { machineryChecks: [...filtered, response.data] };
+      });
+    } catch (error: any) {
+      console.error('Failed to update machinery check:', error);
+    }
+  },
+  updatePostMachineryStatus: async (postId, status) => {
+    try {
+      const response = await apiClient.put(`/machinery/post/${postId}/status`, { status });
+      set((state) => ({
+        posts: state.posts.map((p) => (p.id === postId ? response.data : p)),
+      }));
+    } catch (error: any) {
+      console.error('Failed to update post machinery status:', error);
     }
   },
 }));

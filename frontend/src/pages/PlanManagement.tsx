@@ -501,6 +501,7 @@ export default function PlanManagement() {
   } | null>(null);
 
   const [shiftFilter, setShiftFilter] = useState<'jour' | 'soir' | 'tous'>('tous');
+  const [showMachineryPopup, setShowMachineryPopup] = useState(false);
   const { user } = useAuthStore();
 
   const sensors = useSensors(
@@ -1096,10 +1097,14 @@ export default function PlanManagement() {
         }
         if (items.length > 0) {
           setAutoAssignReplacementPrompt({ items });
+        } else {
+          // If no replacements needed, show machinery checkup popup
+          setShowMachineryPopup(true);
         }
       }
     } catch {
       // ignore: no popup if bookings/replacements fail
+      setShowMachineryPopup(true);
     }
   };
 
@@ -1443,6 +1448,7 @@ export default function PlanManagement() {
                   }
                   await fetchAssignments(currentPlan.id);
                   setAutoAssignReplacementPrompt(null);
+                  setShowMachineryPopup(true);
                 }}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
               >
@@ -1549,6 +1555,49 @@ export default function PlanManagement() {
               >
                 ✕
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMachineryPopup && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all animate-in fade-in zoom-in duration-300">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white text-center relative">
+              <div className="bg-white/20 p-3 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-8 h-8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.423 20.25a2.25 2.25 0 0 0 4.5 0V17.25H11.423v3.00zm0-3.75h4.5m-4.5 0v-4.5h4.5v4.5m-4.5-4.5V9a2.25 2.25 0 0 1 4.5 0v3.00h-4.5zM3 17.25h3.00v3.00H3v-3.00zm0-3.75h3.00v3.00H3v-3.00zm0-3.75h3.00v3.00H3v-3.00zm0-3.75h3.00v3.00H3v-3.00z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold">Checkup Machinerie</h3>
+              <p className="text-blue-100 text-sm mt-2 font-medium">L&apos;assignation est terminée !</p>
+            </div>
+            <div className="p-8 text-center bg-white">
+              <p className="text-gray-700 text-lg leading-relaxed mb-8">
+                L&apos;assignation automatique a été effectuée avec succès.
+                <br />
+                <span className="font-semibold text-gray-900 border-b-2 border-blue-200 pb-1">
+                  Veuillez maintenant vérifier le checkup technique des machineries.
+                </span>
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button
+                  onClick={() => setShowMachineryPopup(false)}
+                  className="px-6 py-3 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all active:scale-95"
+                >
+                  Plus tard
+                </button>
+                <Link
+                  to="/machinery-checkup"
+                  onClick={() => setShowMachineryPopup(false)}
+                  className="px-8 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  Aller au checkup
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
         </div>

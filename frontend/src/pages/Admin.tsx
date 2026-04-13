@@ -75,9 +75,10 @@ export default function Admin() {
   const [showPostModal, setShowPostModal] = useState(false);
 
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
-  const [postForm, setPostForm] = useState<{ name: string; description: string }>({
+  const [postForm, setPostForm] = useState<{ name: string; description: string; needsMachinery: boolean }>({
     name: '',
     description: '',
+    needsMachinery: false,
   });
 
   const [editingWorkerId, setEditingWorkerId] = useState<string | null>(null);
@@ -176,7 +177,7 @@ export default function Admin() {
 
   const startEditPost = (post: Post) => {
     setEditingPostId(post.id);
-    setPostForm({ name: post.name, description: post.description || '' });
+    setPostForm({ name: post.name, description: post.description || '', needsMachinery: post.needsMachinery || false });
   };
 
   const submitPostEdit = async () => {
@@ -571,6 +572,7 @@ export default function Admin() {
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Nom</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-700">Machinerie</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
@@ -596,7 +598,37 @@ export default function Admin() {
                         onChange={(e) => setPostForm((f) => ({ ...f, description: e.target.value }))}
                       />
                     ) : (
-                      p.description || <span className="text-gray-400 italic">Sans description</span>
+                      <div className="flex items-center gap-2">
+                        <span>{p.description || <span className="text-gray-400 italic">Sans description</span>}</span>
+                        {p.machineryStatus === 'FAULTY' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 animate-pulse border border-red-200">
+                            MACHINERIE DÉFECTUEUSE
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {editingPostId === p.id ? (
+                      <input
+                        type="checkbox"
+                        checked={postForm.needsMachinery}
+                        onChange={(e) => setPostForm((f) => ({ ...f, needsMachinery: e.target.checked }))}
+                        className="h-4 w-4 text-green-600 rounded"
+                      />
+                    ) : (
+                      <div className="flex justify-center">
+                        {p.needsMachinery ? (
+                          <span className="text-green-600 flex items-center gap-1 text-xs font-semibold">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4.006-5.503Z" clipRule="evenodd" />
+                            </svg>
+                            Requis
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs">Non</span>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">

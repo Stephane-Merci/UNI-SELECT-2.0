@@ -7,6 +7,8 @@ const router = express.Router();
 const postSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
+  needsMachinery: z.boolean().optional(),
+  machineryStatus: z.string().optional(),
 });
 
 // Order posts: PIC* first, MET* second, then others — each group alphabetically by name

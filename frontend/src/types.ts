@@ -106,6 +106,8 @@ export interface Post {
   id: string;
   name: string;
   description?: string;
+  needsMachinery: boolean;
+  machineryStatus?: string;
   assignments?: Assignment[];
   createdAt: string;
   updatedAt: string;
@@ -201,4 +203,13 @@ export interface Manager {
   canEdit: boolean;
   canPrint: boolean;
   canCreateAccounts: boolean;
+}
+
+export interface MachineryCheck {
+  id: string;
+  planId: string;
+  postId: string;
+  workerId: string;
+  status: 'GOOD' | 'FAULTY' | 'UNKNOWN';
+  checkedAt: string;
 }

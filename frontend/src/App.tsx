@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import { useAuthStore } from './store/useAuthStore';
 import PremiumState from './pages/PremiumState';
 import AbsenceConsultation from './pages/AbsenceConsultation';
+import MachineryCheckup from './pages/MachineryCheckup';
 
 function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
@@ -67,6 +68,12 @@ function App() {
           element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
         >
           <Route index element={<PremiumState />} />
+        </Route>
+        <Route
+          path="/machinery-checkup"
+          element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}
+        >
+          <Route index element={<MachineryCheckup />} />
         </Route>
         <Route
           path="/admin"

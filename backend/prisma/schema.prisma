@@ -9,63 +9,68 @@ datasource db {
 }
 
 model Worker {
-  id                   String               @id @default(cuid())
-  anciennete           String               @unique(map: "Worker_matricule_key")
+  id                   String                  @id @default(cuid())
+  anciennete           String                  @unique(map: "Worker_matricule_key")
   name                 String
-  type                 WorkerType           @default(PERMANENT_JOUR)
+  type                 WorkerType              @default(PERMANENT_JOUR)
   originalPostId       String
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
   /// Weekly pre-retirement day (e.g. MONDAY–FRIDAY). When a plan's date matches this weekday,
   /// the worker is automatically marked as PRERETRAITE for that plan.
   preRetraiteDay       String?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  absenceStartDate     DateTime?
   absenceEndDate       DateTime?
+  absenceStartDate     DateTime?
   assignments          Assignment[]
-  bookingAssignments   BookingAssignment[]
-  bookingReplacements1 BookingReplacement[] @relation("Replacement1")
-  bookingReplacements2 BookingReplacement[] @relation("Replacement2")
-  bookingReplacements3 BookingReplacement[] @relation("Replacement3")
-  bookingReplacements4 BookingReplacement[] @relation("Replacement4")
-  bookingReplacements5 BookingReplacement[] @relation("Replacement5")
-  bookingReplacements6 BookingReplacement[] @relation("Replacement6")
-  bookingReplacements7 BookingReplacement[] @relation("Replacement7")
-  bookingReplacements8 BookingReplacement[] @relation("Replacement8")
-  originalPost         Post                 @relation("OriginalPost", fields: [originalPostId], references: [id])
-  presences            WorkerPresence[]
   interactions         AssignmentInteraction[]
+  bookingAssignments   BookingAssignment[]
+  bookingReplacements1 BookingReplacement[]    @relation("Replacement1")
+  bookingReplacements2 BookingReplacement[]    @relation("Replacement2")
+  bookingReplacements3 BookingReplacement[]    @relation("Replacement3")
+  bookingReplacements4 BookingReplacement[]    @relation("Replacement4")
+  bookingReplacements5 BookingReplacement[]    @relation("Replacement5")
+  bookingReplacements6 BookingReplacement[]    @relation("Replacement6")
+  bookingReplacements7 BookingReplacement[]    @relation("Replacement7")
+  bookingReplacements8 BookingReplacement[]    @relation("Replacement8")
+  machineryChecks      MachineryCheck[]
+  originalPost         Post                    @relation("OriginalPost", fields: [originalPostId], references: [id])
+  presences            WorkerPresence[]
 
   @@index([type])
   @@index([anciennete], map: "Worker_matricule_idx")
 }
 
 model Post {
-  id                  String               @id @default(cuid())
+  id                  String                  @id @default(cuid())
   name                String
   description         String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  isMachineryFaulty   Boolean                 @default(false)
+  needsMachinery      Boolean                 @default(false)
   assignments         Assignment[]
+  interactions        AssignmentInteraction[]
   bookingAssignments  BookingAssignment[]
   bookingReplacements BookingReplacement[]
-  originalWorkers     Worker[]             @relation("OriginalPost")
+  machineryChecks     MachineryCheck[]
   unfilledPositions   UnfilledPosition[]
-  interactions        AssignmentInteraction[]
+  originalWorkers     Worker[]                @relation("OriginalPost")
 
   @@index([name])
 }
 
 model Plan {
-  id              String           @id @default(cuid())
-  name            String
-  date            DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @default(now()) @updatedAt
-  createdBy       String?
-  assignments     Assignment[]
-  workerPresences WorkerPresence[]
-  unfilledPositions UnfilledPosition[]
+  id                String                  @id @default(cuid())
+  name              String
+  date              DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @default(now()) @updatedAt
+  createdBy         String?
+  assignments       Assignment[]
   interactions      AssignmentInteraction[]
+  machineryChecks   MachineryCheck[]
+  unfilledPositions UnfilledPosition[]
+  workerPresences   WorkerPresence[]
 
   @@index([name])
   @@index([date])
@@ -74,10 +79,10 @@ model Plan {
 model UnfilledPosition {
   id        String   @id @default(cuid())
   planId    String
-  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
   postId    String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([planId])
   @@index([postId])
@@ -170,35 +175,52 @@ model BookingReplacement {
 }
 
 model Manager {
-  id               String   @id @default(cuid())
-  username         String   @unique
-  email            String?  @unique
-  passwordHash     String
-  resetToken       String?  @unique
-  resetTokenExpiry DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  canEdit           Boolean  @default(true)
-  canPrint          Boolean  @default(true)
-  canCreateAccounts Boolean  @default(true)
+  id                String    @id @default(cuid())
+  username          String    @unique
+  email             String?   @unique
+  passwordHash      String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  resetToken        String?   @unique
+  resetTokenExpiry  DateTime?
+  canCreateAccounts Boolean   @default(true)
+  canEdit           Boolean   @default(true)
+  canPrint          Boolean   @default(true)
 
   @@index([username])
   @@index([email])
 }
 
 model AssignmentInteraction {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   planId    String
   workerId  String
   postId    String
-  startedAt DateTime @default(now())
+  startedAt DateTime  @default(now())
   endedAt   DateTime?
-  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
-  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  plan      Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  worker    Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
   @@index([planId])
   @@index([workerId])
+  @@index([postId])
+}
+
+model MachineryCheck {
+  id        String   @id @default(cuid())
+  planId    String
+  postId    String
+  workerId  String
+  isDone    Boolean  @default(false)
+  isFaulty  Boolean  @default(false)
+  updatedAt DateTime @default(now())
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, postId])
+  @@index([planId])
   @@index([postId])
 }
 
