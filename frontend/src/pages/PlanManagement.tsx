@@ -460,6 +460,7 @@ export default function PlanManagement() {
       id: string;
       name: string;
       anciennete: string;
+      currentPostId?: string;
       isAbsentZone?: boolean;
       isPreRetraiteToday?: boolean;
       assignedElsewhere?: boolean;
@@ -941,17 +942,7 @@ export default function PlanManagement() {
       const pt = presenceMap[w.id] ?? w.type;
       return visibleGroupTypes.includes(pt);
     });
-    // Only assign Permanent jour / Permanent soir (not mobile, not occasionel)
-    const permanentOnly = [
-      WorkerType.PERMANENT_JOUR,
-      WorkerType.PERMANENT_SOIR,
-      WorkerType.JOUR,
-      WorkerType.SOIR,
-    ];
-    const toAssign = visibleWorkers.filter((w) => {
-      const pt = presenceMap[w.id] ?? w.type;
-      return permanentOnly.includes(pt);
-    });
+    const toAssign = visibleWorkers; // Assign all visible workers (Permanent, Mobile, and Occasionel)
 
     // Assign every worker to their original post only — do NOT auto-assign replacements to replacement posts
     // Build a fresh assignment map from the workers we just assigned (React state is stale at this point)

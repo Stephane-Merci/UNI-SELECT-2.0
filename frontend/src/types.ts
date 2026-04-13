@@ -72,7 +72,7 @@ export const WorkerTypeColors: Record<WorkerType, string> = {
   [WorkerType.OCCASIONEL_DU_JOUR]: '#0000FF',   // Bleu (Occasionnels jours)
   [WorkerType.OCCASIONEL_SOIR]: '#A52A2A',  // Marron (Occasionnels de soir)
   [WorkerType.MOBILITE_DU_JOUR]: '#EE82EE',     // Violet (Mobiles de jour)
-  [WorkerType.MOBILITE_DU_SOIR]: '#FFA500',     // Orange (Mobiles de soir)
+  [WorkerType.MOBILITE_DU_SOIR]: '#0000FF',     // Bleu (Modifié d'Orange à Bleu)
   [WorkerType.JOUR]: '#0000FF',
   [WorkerType.SOIR]: '#EE82EE',
   [WorkerType.ABSENT]: '#FF0000',            // Rouge (Absents)

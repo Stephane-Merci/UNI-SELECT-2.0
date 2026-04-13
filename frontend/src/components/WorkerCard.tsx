@@ -22,8 +22,6 @@ interface WorkerCardProps {
   dragId?: string;
   /** Currently assigned post id (to compare with originalPostId). */
   currentPostId?: string;
-  /** Force disable any blinking even if moved. */
-  disableBlinking?: boolean;
 }
 
 export default function WorkerCard({ 
@@ -31,7 +29,6 @@ export default function WorkerCard({
   presenceType,
   dragId,
   currentPostId,
-  disableBlinking
 }: WorkerCardProps) {
   const sortableId = dragId ?? worker.id;
   const {
@@ -54,13 +51,19 @@ export default function WorkerCard({
     WorkerType.TRAVAIL_LEGER
   ].includes(displayType);
 
-  const isMoved = 
-    !disableBlinking &&
+  const isPermanent = [
+    WorkerType.PERMANENT_JOUR,
+    WorkerType.PERMANENT_SOIR,
+    WorkerType.JOUR,
+    WorkerType.SOIR
+  ].includes(displayType);
+
+  const isMisplacedPermanent = 
+    isPermanent &&
     currentPostId && 
     worker.originalPostId && 
     currentPostId !== worker.originalPostId && 
-    // Don't blink if they are unassigned (in presence box) AND it's a normal absence group
-    !(currentPostId === 'presence' && isAbsent);
+    currentPostId !== 'presence';
   
   const hexToRgba = (hex: string, alpha: number) => {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -74,8 +77,9 @@ export default function WorkerCard({
     transition,
     opacity: isDragging ? 0.5 : 1,
     backgroundColor: hexToRgba(typeColor, 0.15),
-    borderColor: typeColor,
-    borderWidth: '1px',
+    borderColor: isMisplacedPermanent ? '#FF0000' : typeColor,
+    borderWidth: isMisplacedPermanent ? '3px' : '1px',
+    boxShadow: isMisplacedPermanent ? '0 0 8px rgba(255, 0, 0, 0.6)' : undefined,
   };
 
   const postName = worker.originalPost?.name ?? '-';
@@ -87,7 +91,7 @@ export default function WorkerCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={`rounded px-1 py-0.5 shadow-sm hover:shadow cursor-move border text-[10px] leading-tight w-[110px] max-w-full min-w-0 overflow-hidden ${isMoved ? 'animate-worker-moved' : ''}`}
+      className={`rounded px-1 py-0.5 shadow-sm hover:shadow cursor-move border text-[10px] leading-tight w-[110px] max-w-full min-w-0 overflow-hidden ${isMisplacedPermanent ? 'z-10' : ''}`}
     >
       <div className="flex flex-col gap-px">
         <div className="font-medium text-gray-900 truncate">({worker.anciennete}) {worker.name}</div>
