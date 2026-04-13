@@ -89,8 +89,10 @@ export default function WorkerCard({
     opacity: isDragging ? 0.5 : 1,
     backgroundColor: hexToRgba(typeColor, 0.15),
     borderColor: isMisplaced ? misplacedColor : typeColor,
-    borderWidth: isMisplaced ? '3px' : '1px',
-    boxShadow: isMisplaced ? `0 0 8px ${hexToRgba(misplacedColor, 0.6)}` : undefined,
+    borderWidth: '1px',
+    boxShadow: isMisplaced 
+      ? `0 0 0 2px ${misplacedColor}, 0 0 8px ${hexToRgba(misplacedColor, 0.6)}` 
+      : undefined,
   };
 
   const postName = worker.originalPost?.name ?? '-';

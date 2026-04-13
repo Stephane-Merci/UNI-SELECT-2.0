@@ -31,13 +31,6 @@ import apiClient from '../api/client';
 import type { Booking, BookingReplacement } from '../types';
 import { formatLocalDate, getUTCDayOfWeek, normalizeToUTC } from '../utils/dateUtils';
 
-const hexToRgba = (hex: string, alpha: number) => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
 // 6 main availabilities — search filters only these.
 const MAIN_PRESENCE_GROUPS: Record<string, WorkerType[]> = {
   'Permanent jour': [WorkerType.PERMANENT_JOUR, WorkerType.JOUR],
@@ -92,12 +85,12 @@ function PresenceBox({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-white rounded-lg p-2 border-2 min-h-0 ${isOver ? 'bg-blue-50 border-blue-400' : ''
+      className={`rounded-lg p-2 min-h-0 ${isOver ? 'bg-blue-50 border-blue-400' : ''
         }`}
       style={{
-        backgroundColor: hexToRgba(WorkerTypeColors[primaryType], 0.15),
+        backgroundColor: '#f3f4f6', 
         borderColor: WorkerTypeColors[primaryType],
-        borderWidth: '1px',
+        borderWidth: '2px',
       }}
     >
       <h3
@@ -1000,7 +993,7 @@ export default function PlanManagement() {
               .map((id) => {
                 const w = workers.find((work) => work.id === id);
                 if (!w) return null;
-                const presence = presenceMap[w.id] || w.type;
+                const presence = presenceMap[w.id] ?? w.type;
                 const isAbsentZone = [
                   WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE,
                   WorkerType.PRERETRAITE, WorkerType.CONGE_PARENTAL, WorkerType.LIBERATION_EXTERNE
@@ -1052,7 +1045,7 @@ export default function PlanManagement() {
               .map((id) => {
                 const w = workers.find((work) => work.id === id);
                 if (!w) return null;
-                const presence = presenceMap[w.id] || w.type;
+                const presence = presenceMap[w.id] ?? w.type;
                 const isAbsentZone = [
                   WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE,
                   WorkerType.PRERETRAITE, WorkerType.CONGE_PARENTAL, WorkerType.LIBERATION_EXTERNE
@@ -1119,79 +1112,80 @@ export default function PlanManagement() {
               )}
             </div>
             
+            {/* Statistics Section */}
             {currentPlan && (
-              <div className="flex items-center gap-6 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-inner">
-                <div className="flex flex-col items-center">
+              <div className="flex items-center gap-6 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-inner shrink-0">
+                <div className="flex flex-col items-center w-10">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">PIC</span>
-                  <span className="text-lg font-black text-blue-600">{stats.pic}</span>
+                  <span className="text-lg font-black text-blue-600 leading-none">{stats.pic}</span>
                 </div>
                 <div className="h-8 w-px bg-gray-200"></div>
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center w-10">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">MET</span>
-                  <span className="text-lg font-black text-emerald-600">{stats.met}</span>
+                  <span className="text-lg font-black text-emerald-600 leading-none">{stats.met}</span>
                 </div>
                 <div className="h-8 w-px bg-gray-200"></div>
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center w-12">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Autres</span>
-                  <span className="text-lg font-black text-slate-600">{stats.others}</span>
+                  <span className="text-lg font-black text-slate-600 leading-none">{stats.others}</span>
                 </div>
                 <div className="h-8 w-px bg-gray-300"></div>
-                <div className="flex flex-col items-center px-2">
+                <div className="flex flex-col items-center px-2 w-14">
                   <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Total</span>
-                  <span className="text-xl font-black text-indigo-700">{stats.total}</span>
+                  <span className="text-xl font-black text-indigo-700 leading-none">{stats.total}</span>
                 </div>
               </div>
             )}
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 shrink-0">
               {user?.canEdit && currentPlan && lastPlanAction && (
                 <button
                   type="button"
                   onClick={handleUndoPlan}
-                  className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700"
+                  className="px-3 py-1.5 bg-slate-600 text-white rounded-md hover:bg-slate-700 text-sm whitespace-nowrap"
                   title="Annuler la dernière action"
                 >
-                  Annuler l&apos;action
+                  Annuler
                 </button>
               )}
               {currentPlan && (
                 <Link
                   to="/replacements"
-                  className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700"
+                  className="px-3 py-1.5 bg-violet-600 text-white rounded-md hover:bg-violet-700 text-sm whitespace-nowrap"
                 >
-                  Voir remplacements
+                  Remplacements
                 </Link>
               )}
               {currentPlan && (
                 <Link
                   to={`/premium-state?planId=${currentPlan.id}`}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 shadow-sm"
+                  className="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 shadow-sm text-sm whitespace-nowrap"
                 >
-                  État de Prime
+                  Prime
                 </Link>
               )}
               <button
                 onClick={() => setShowPlanModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm whitespace-nowrap"
               >
-                {currentPlan ? 'Gérer les Plans' : 'Créer un Plan'}
+                {currentPlan ? 'Plans' : 'Créer'}
               </button>
               {user?.canEdit && currentPlan && (
                 <button
                   onClick={async () => {
-                    if (window.confirm(`Êtes-vous sûr de vouloir réinitialiser le plan « ${currentPlan.name} » ? Toutes les assignations et postes à combler seront supprimés.`)) {
+                    if (window.confirm(`Êtes-vous sûr de vouloir réinitialiser le plan « ${currentPlan.name} » ? Toutes les assignations et postes seront supprimés.`)) {
                       try {
                         const { resetPlan } = useStore.getState();
                         await resetPlan(currentPlan.id);
                       } catch (error: any) {
-                        alert(error.message || 'Échec de la réinitialisation du plan');
+                        alert(error.message || 'Échec');
                       }
                     }
                   }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm"
-                  title="Réinitialiser le plan à son état initial"
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm text-sm whitespace-nowrap"
+                  title="Réinitialiser"
                 >
-                  Réinitialiser le Plan
+                  Reset
                 </button>
               )}
             </div>
