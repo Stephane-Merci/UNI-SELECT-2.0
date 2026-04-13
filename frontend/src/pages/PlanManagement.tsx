@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
@@ -30,6 +30,13 @@ import { io } from 'socket.io-client';
 import apiClient from '../api/client';
 import type { Booking, BookingReplacement } from '../types';
 import { formatLocalDate, getUTCDayOfWeek, normalizeToUTC } from '../utils/dateUtils';
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 // 6 main availabilities — search filters only these.
 const MAIN_PRESENCE_GROUPS: Record<string, WorkerType[]> = {
@@ -88,8 +95,9 @@ function PresenceBox({
       className={`bg-white rounded-lg p-2 border-2 min-h-0 ${isOver ? 'bg-blue-50 border-blue-400' : ''
         }`}
       style={{
-        borderLeftColor: WorkerTypeColors[primaryType],
-        borderLeftWidth: '4px',
+        backgroundColor: hexToRgba(WorkerTypeColors[primaryType], 0.15),
+        borderColor: WorkerTypeColors[primaryType],
+        borderWidth: '1px',
       }}
     >
       <h3
@@ -102,11 +110,6 @@ function PresenceBox({
         items={groupWorkers.map((w) => `${PRESENCE_DRAG_PREFIX}${w.id}`)}
         strategy={verticalListSortingStrategy}
       >
-        {/* 
-          Use a responsive grid that wraps workers instead of forcing the box
-          to grow horizontally. When the fiche de présence panel is narrowed,
-          cards will flow to the next row instead of stretching the section.
-        */}
         <div className="grid gap-0.5 min-h-0 grid-cols-[repeat(auto-fill,minmax(110px,1fr))]">
           {groupWorkers.length > 0 ? (
             groupWorkers.map((worker) => {
@@ -241,7 +244,6 @@ function SortablePostColumn({
     transition,
   };
 
-  // Locked: fixed width, only wraps when no space. Unlocked: can grow and unwrap when zone increases.
   const wrapperClass = isLocked
     ? 'w-[130px] flex-shrink-0'
     : 'min-w-[130px] flex-1 basis-[130px]';
@@ -273,9 +275,6 @@ function SortablePostColumn({
   );
 }
 
-// Posts Panel Component (Left Side) - Only posts, no unassigned.
-// Workers in attendance/absence (Absent, Vacances, etc.) are not shown on posts.
-// Supports reordering (drag) and lock; locked posts have fixed width and only wrap when no space.
 function PostsPanel({
   posts,
   workers,
@@ -313,7 +312,6 @@ function PostsPanel({
         if (assignments[worker.id] !== postId) return false;
         const pt = presences[worker.id] ?? worker.type;
         
-        // Filter by shift if needed
         if (shiftFilter === 'jour' && !WORKER_TYPES_JOUR.includes(pt)) return false;
         if (shiftFilter === 'soir' && !WORKER_TYPES_SOIR.includes(pt)) return false;
 
@@ -434,58 +432,27 @@ export default function PlanManagement() {
     setFullScreen,
   } = useStore();
 
-  const baseOrderedPosts =
-    currentPlan && posts.length > 0
+  const orderedPosts = useMemo(() => {
+    let base = currentPlan && posts.length > 0
       ? getPlanPostOrder(currentPlan.id, posts.map((p) => p.id))
         .map((id) => posts.find((p) => p.id === id))
         .filter((p): p is Post => !!p)
       : posts;
-
-  /** Sort posts so "Mobile" or "Occasionel" are always at the end. */
-  const orderedPosts = [...baseOrderedPosts].sort((a, b) => {
-    const isA = a.name.toLowerCase().includes('mobile') || a.name.toLowerCase().includes('occasionel');
-    const isB = b.name.toLowerCase().includes('mobile') || b.name.toLowerCase().includes('occasionel');
-    if (isA && !isB) return 1;
-    if (!isA && isB) return -1;
-    return 0;
-  });
-
-  // Calculate statistics (filter-sensitive)
-  const stats = (() => {
-    const activeAssignedWorkers = workers.filter(w => {
-      const postId = assignmentMap[w.id];
-      if (!postId) return false;
-      const pt = presenceMap[w.id] ?? w.type;
-      
-      // Shift filter
-      if (shiftFilter === 'jour' && !WORKER_TYPES_JOUR.includes(pt)) return false;
-      if (shiftFilter === 'soir' && !WORKER_TYPES_SOIR.includes(pt)) return false;
-      
-      return !ATTENDANCE_PRESENCE_TYPES.has(pt);
+    
+    return [...base].sort((a, b) => {
+      const isSpecialA = a.name.toLowerCase().includes('mobile') || a.name.toLowerCase().includes('occasionel');
+      const isSpecialB = b.name.toLowerCase().includes('mobile') || b.name.toLowerCase().includes('occasionel');
+      if (isSpecialA && !isSpecialB) return 1;
+      if (!isSpecialA && isSpecialB) return -1;
+      return 0;
     });
-
-    let pic = 0;
-    let met = 0;
-    let others = 0;
-
-    activeAssignedWorkers.forEach(w => {
-      const postId = assignmentMap[w.id];
-      const post = posts.find(p => p.id === postId);
-      if (!post) return;
-      const n = post.name.toUpperCase();
-      if (n.includes('PIC')) pic++;
-      else if (n.includes('MET')) met++;
-      else others++;
-    });
-
-    return { pic, met, others, total: activeAssignedWorkers.length };
-  })();
+  }, [currentPlan, posts, getPlanPostOrder]);
   const lockedPostIds = currentPlan ? getPlanLockedPosts(currentPlan.id) : new Set<string>();
-  void planLayoutVersion[currentPlan ? 'global' : '']; // subscribe for re-renders (layout is shared across plans)
+  void planLayoutVersion[currentPlan ? 'global' : ''];
 
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);
   const [showPlanModal, setShowPlanModal] = useState(false);
-  const [leftPanelWidth, setLeftPanelWidth] = useState(50); // Percentage
+  const [leftPanelWidth, setLeftPanelWidth] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
   const [isResizeLocked, setIsResizeLocked] = useState(false);
   const [presenceSearchFilter, setPresenceSearchFilter] = useState('');
@@ -568,7 +535,6 @@ export default function PlanManagement() {
     if (currentPlan) {
       fetchAssignments(currentPlan.id);
 
-      // Check for returning workers (whose absenceEndDate is <= current plan date)
       const planDate = normalizeToUTC(currentPlan.date) || normalizeToUTC(new Date());
       if (!planDate) return;
 
@@ -588,16 +554,14 @@ export default function PlanManagement() {
     }
   }, [currentPlan, fetchAssignments, workers, returningWorkerPrompt]);
 
-  // Automatically apply PRERETRAITE presence based on weekly pré-retraite day when loading a plan.
   useEffect(() => {
     const applyPreRetraiteForPlan = async () => {
       if (!currentPlan?.id || !currentPlan.date) return;
       if (preRetraiteAppliedPlanId === currentPlan.id) return;
 
-      // Mark as applied immediately to prevent re-entry during async calls
       setPreRetraiteAppliedPlanId(currentPlan.id);
 
-      const weekday = getUTCDayOfWeek(currentPlan.date); // 0=Sunday, 1=Monday, ... 6=Saturday
+      const weekday = getUTCDayOfWeek(currentPlan.date);
       const weekdayKey =
         weekday === 1
           ? 'MONDAY'
@@ -618,7 +582,6 @@ export default function PlanManagement() {
 
       for (const w of affected) {
         await updateWorkerPresence(currentPlan.id, w.id, WorkerType.PRERETRAITE);
-        // Also remove assignment if exists, to ensure they are "sent" to the presence zone completely
         const existingAssignment = assignments.find(
           (a) => a.workerId === w.id && a.planId === currentPlan.id
         );
@@ -688,19 +651,49 @@ export default function PlanManagement() {
     };
   }, [currentPlan, fetchAssignments, fetchPlans, loadPlan]);
 
-  // Build presence map
   const presenceMap: Record<string, WorkerType> = {};
   workerPresences.forEach((presence) => {
     presenceMap[presence.workerId] = presence.type;
   });
 
-  // Build assignment map
   const assignmentMap: Record<string, string> = {};
   assignments
     .filter((a) => a.planId === currentPlan?.id)
     .forEach((assignment) => {
       assignmentMap[assignment.workerId] = assignment.postId;
     });
+
+  const stats = useMemo(() => {
+    if (!currentPlan) return { pic: 0, met: 0, others: 0, total: 0 };
+    
+    let pic = 0;
+    let met = 0;
+    let others = 0;
+
+    const activeAssignments = assignments.filter(a => a.planId === currentPlan.id);
+    
+    activeAssignments.forEach(a => {
+      const worker = workers.find(w => w.id === a.workerId);
+      if (!worker) return;
+
+      const pt = presenceMap[worker.id] ?? worker.type;
+      
+      // Respect shift filter
+      if (shiftFilter === 'jour' && !WORKER_TYPES_JOUR.includes(pt)) return;
+      if (shiftFilter === 'soir' && !WORKER_TYPES_SOIR.includes(pt)) return;
+      if (ATTENDANCE_PRESENCE_TYPES.has(pt)) return;
+
+      const post = posts.find(p => p.id === a.postId);
+      if (!post) return;
+
+      const name = post.name.toUpperCase();
+      if (name.includes('PIC')) pic++;
+      else if (name.includes('MET')) met++;
+      else others++;
+    });
+
+    return { pic, met, others, total: pic + met + others };
+  }, [currentPlan, assignments, workers, presenceMap, shiftFilter, posts, ATTENDANCE_PRESENCE_TYPES]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -717,7 +710,6 @@ export default function PlanManagement() {
         : null;
     if (!workerShift) return;
 
-    // Use status from store to avoid stale closure in handleDragEnd
     const currentAssignments = useStore.getState().assignments.filter(a => a.planId === currentPlan?.id);
     const currentAssignmentMap: Record<string, string> = {};
     currentAssignments.forEach(a => { currentAssignmentMap[a.workerId] = a.postId; });
@@ -831,7 +823,6 @@ export default function PlanManagement() {
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    // Post column reorder (plan zone)
     if (activeId.startsWith(POST_COLUMN_DRAG_PREFIX)) {
       if (overId.startsWith(POST_COLUMN_DRAG_PREFIX)) {
         const fromPostId = activeId.slice(POST_COLUMN_DRAG_PREFIX.length);
@@ -857,10 +848,8 @@ export default function PlanManagement() {
     const worker = workers.find((w) => w.id === workerId);
     const previousPresenceType = presenceMap[workerId] ?? worker?.type ?? ('' as WorkerType);
     const previousPostId = assignmentMap[workerId] ?? null;
-    // Check if dropping on a presence type box (fiche de présence): unassign from post and update presence
     if (overId.startsWith('presence-')) {
       setLastPlanAction({ workerId, previousPostId, previousPresenceType });
-      // Remove assignment so worker disappears from posts section and appears in fiche de présence
       const existingAssignment = assignments.find(
         (a) => a.workerId === workerId && a.planId === currentPlan.id
       );
@@ -876,27 +865,21 @@ export default function PlanManagement() {
         }
       }
 
-      // Crucial check: if this worker was the only one from their shift on their post, and the post has replacements, prompt to choose a replacement
       if (previousPostId && worker) {
         await checkAndPromptReplacement(worker, previousPostId, workerId);
       }
       return;
     }
 
-    // Check if dropping on a post (overId can be post.id or post-column-{post.id} with pointerWithin)
     const postIdForDrop = overId.startsWith(POST_COLUMN_DRAG_PREFIX) ? overId.slice(POST_COLUMN_DRAG_PREFIX.length) : overId;
     const post = posts.find((p) => p.id === postIdForDrop);
     if (post) {
-      // Keep previousPostId so Undo can restore: if worker was on another post, put them back there; if from fiche de présence, previousPostId is null and Undo will remove assignment
       setLastPlanAction({ workerId, previousPostId, previousPresenceType });
-      // When assigning from presence/absence (Absent, Vacances, etc.) to a post, set presence
-      // back to the worker's origin type (e.g. PERMANENT_JOUR) so they're shown as "back to work"
       if (worker) {
         void updateWorkerPresence(currentPlan.id, workerId, worker.type);
       }
       void assignWorker(currentPlan.id, workerId, post.id);
 
-      // Trigger replacement check for the SOURCE post if it's now empty
       if (previousPostId && worker) {
         await checkAndPromptReplacement(worker, previousPostId, workerId);
       }
@@ -942,7 +925,6 @@ export default function PlanManagement() {
       const containerRect = container.getBoundingClientRect();
       const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
 
-      // Limit between 20% and 80%
       const clampedWidth = Math.max(20, Math.min(80, newLeftWidth));
       setLeftPanelWidth(clampedWidth);
     };
@@ -966,9 +948,7 @@ export default function PlanManagement() {
     };
   }, [isResizing]);
 
-  // Posts panel: all workers (assignments filter who appears on each post)
   const allWorkersForDisplay = workers;
-  // Fiche de présence: only workers not assigned to any post; once dragged to a post they disappear from here
   const workersForPresencePanel = workers.filter((w) => !assignmentMap[w.id]);
 
   const handleAutoAssign = async () => {
@@ -981,19 +961,14 @@ export default function PlanManagement() {
       const pt = presenceMap[w.id] ?? w.type;
       return visibleGroupTypes.includes(pt);
     });
-    const toAssign = visibleWorkers; // Assign all visible workers (Permanent, Mobile, and Occasionel)
+    const toAssign = visibleWorkers;
 
-    // Assign every worker to their original post only — do NOT auto-assign replacements to replacement posts
-    // Build a fresh assignment map from the workers we just assigned (React state is stale at this point)
     const freshAssignmentMap: Record<string, string> = { ...assignmentMap };
     for (const w of toAssign) {
       await assignWorker(currentPlan.id, w.id, w.originalPostId);
       freshAssignmentMap[w.id] = w.originalPostId;
     }
 
-    // After auto-assign, detect posts that have all their workers absent/in-absence-zone but have replacements defined.
-    // Show a popup so the manager can choose whether to assign those replacements.
-    // We use freshAssignmentMap (built above) instead of assignmentMap (which is stale React state).
     try {
       const bookingsRes = await apiClient.get<Booking[]>('/bookings');
       const bookingsList = bookingsRes.data ?? [];
@@ -1008,23 +983,17 @@ export default function PlanManagement() {
         const items: any[] = [];
         for (const r of replList) {
           const postId = r.postId;
-          // Use originalPostId to find ALL workers who belong to this post (present OR absent).
-          // freshAssignmentMap only contains workers who were actively assigned in this run;
-          // workers manually placed in an absence zone before auto-assign are not in the map,
-          // so checking originalPostId ensures we still detect that the post needs a replacement.
           const workersOnPost = workers.filter((w) => w.originalPostId === postId);
           const postName = posts.find((p) => p.id === postId)?.name ?? postId;
 
           const planDateStr = currentPlan.date ? formatLocalDate(currentPlan.date, 'en-US', { weekday: 'long' }).toUpperCase() : '';
 
-          // Check Jour shift
           const jourWorkers = workersOnPost.filter((w) => WORKER_TYPES_JOUR.includes(w.type));
           const activeJourWorkers = jourWorkers.filter((w) => {
             const pt = presenceMap[w.id] ?? w.type;
             return !ATTENDANCE_PRESENCE_TYPES.has(pt);
           });
 
-          // Only trigger replacement if there ARE scheduled jour workers on this post but ALL are absent/in-absence-zone
           if (jourWorkers.length > 0 && activeJourWorkers.length === 0) {
             const workerIds = [r.replacement1WorkerId, r.replacement2WorkerId, r.replacement3WorkerId, r.replacement4WorkerId].filter((id): id is string => !!id);
             const options = workerIds
@@ -1071,14 +1040,12 @@ export default function PlanManagement() {
             }
           }
 
-          // Check Soir shift
           const soirWorkers = workersOnPost.filter((w) => WORKER_TYPES_SOIR.includes(w.type));
           const activeSoirWorkers = soirWorkers.filter((w) => {
             const pt = presenceMap[w.id] ?? w.type;
             return !ATTENDANCE_PRESENCE_TYPES.has(pt);
           });
 
-          // Only trigger replacement if there ARE scheduled soir workers on this post but ALL are absent/in-absence-zone
           if (soirWorkers.length > 0 && activeSoirWorkers.length === 0) {
             const workerIds = [r.replacement5WorkerId, r.replacement6WorkerId, r.replacement7WorkerId, r.replacement8WorkerId].filter((id): id is string => !!id);
             const options = workerIds
@@ -1128,65 +1095,60 @@ export default function PlanManagement() {
         if (items.length > 0) {
           setAutoAssignReplacementPrompt({ items });
         } else {
-          // If no replacements needed, show machinery checkup popup
           setShowMachineryPopup(true);
         }
       }
     } catch {
-      // ignore: no popup if bookings/replacements fail
       setShowMachineryPopup(true);
     }
   };
 
   return (
-    <div className={`w-full flex flex-col bg-gray-50 ${isFullScreen ? 'h-[calc(100vh-20px)]' : 'h-[calc(100vh-130px)]'}`}>
-      {/* Header */}
+    <div className={`w-full flex flex-col bg-gray-50 ${isFullScreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(100vh-130px)]'}`}>
       {!isFullScreen && (
-        <div className="bg-white shadow-sm border-b px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-6">
-              <div className="flex flex-col">
-                <h1 className="text-2xl font-bold text-gray-900 leading-tight">
-                  {currentPlan ? currentPlan.name : 'Aucun plan sélectionné'}
-                </h1>
-                {currentPlan && (
-                  <span className="text-sm text-gray-500">
-                    {formatLocalDate(currentPlan.date)}
-                  </span>
-                )}
-              </div>
-
+        <div className="bg-white shadow-sm border-b px-6 py-4 shrink-0">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold text-gray-900">
+                {currentPlan ? currentPlan.name : 'Aucun plan sélectionné'}
+              </h1>
               {currentPlan && (
-                <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm space-x-4">
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-gray-400">PIC</span>
-                    <span className="text-sm font-bold text-blue-600">{stats.pic}</span>
-                  </div>
-                  <div className="w-px h-6 bg-gray-200" />
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-gray-400">MET</span>
-                    <span className="text-sm font-bold text-indigo-600">{stats.met}</span>
-                  </div>
-                  <div className="w-px h-6 bg-gray-200" />
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-gray-400">Others</span>
-                    <span className="text-sm font-bold text-gray-600">{stats.others}</span>
-                  </div>
-                  <div className="w-px h-6 bg-gray-200" />
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-gray-400">Total</span>
-                    <span className="text-sm font-bold text-emerald-600">{stats.total}</span>
-                  </div>
-                </div>
+                <span className="text-sm text-gray-500">
+                  {formatLocalDate(currentPlan.date)}
+                </span>
               )}
             </div>
+            
+            {currentPlan && (
+              <div className="flex items-center gap-6 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-inner">
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">PIC</span>
+                  <span className="text-lg font-black text-blue-600">{stats.pic}</span>
+                </div>
+                <div className="h-8 w-px bg-gray-200"></div>
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">MET</span>
+                  <span className="text-lg font-black text-emerald-600">{stats.met}</span>
+                </div>
+                <div className="h-8 w-px bg-gray-200"></div>
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Autres</span>
+                  <span className="text-lg font-black text-slate-600">{stats.others}</span>
+                </div>
+                <div className="h-8 w-px bg-gray-300"></div>
+                <div className="flex flex-col items-center px-2">
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Total</span>
+                  <span className="text-xl font-black text-indigo-700">{stats.total}</span>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center space-x-4">
               {user?.canEdit && currentPlan && lastPlanAction && (
                 <button
                   type="button"
                   onClick={handleUndoPlan}
-                  className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 transition-colors"
+                  className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700"
                   title="Annuler la dernière action"
                 >
                   Annuler l&apos;action
@@ -1195,7 +1157,7 @@ export default function PlanManagement() {
               {currentPlan && (
                 <Link
                   to="/replacements"
-                  className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition-colors"
+                  className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700"
                 >
                   Voir remplacements
                 </Link>
@@ -1203,14 +1165,14 @@ export default function PlanManagement() {
               {currentPlan && (
                 <Link
                   to={`/premium-state?planId=${currentPlan.id}`}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 shadow-sm transition-colors"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 shadow-sm"
                 >
                   État de Prime
                 </Link>
               )}
               <button
                 onClick={() => setShowPlanModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 {currentPlan ? 'Gérer les Plans' : 'Créer un Plan'}
               </button>
@@ -1226,7 +1188,7 @@ export default function PlanManagement() {
                       }
                     }
                   }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm transition-colors"
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm"
                   title="Réinitialiser le plan à son état initial"
                 >
                   Réinitialiser le Plan
@@ -1237,7 +1199,6 @@ export default function PlanManagement() {
         </div>
       )}
 
-      {/* Main Content - Two Panels */}
       {currentPlan ? (
         <DndContext
           sensors={user?.canEdit ? sensors : []}
@@ -1246,7 +1207,6 @@ export default function PlanManagement() {
           onDragEnd={wrapDragEnd(handleDragEnd)}
         >
           <div className={`flex-1 flex overflow-hidden gap-4 resizable-container ${isFullScreen ? 'p-2' : 'p-6 pt-0'}`}>
-            {/* Left Panel - Posts */}
             <div
               className="bg-white rounded-lg shadow p-4 overflow-hidden"
               style={{ width: isFullScreen ? '100%' : `${leftPanelWidth}%`, minWidth: isFullScreen ? '100%' : '300px' }}
@@ -1271,7 +1231,6 @@ export default function PlanManagement() {
 
             {!isFullScreen && (
               <>
-                {/* Resizer with Lock */}
                 <div className="flex flex-col items-center gap-2 pt-2">
                   <button
                     type="button"
