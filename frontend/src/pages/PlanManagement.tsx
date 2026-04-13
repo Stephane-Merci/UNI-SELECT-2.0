@@ -434,13 +434,52 @@ export default function PlanManagement() {
     setFullScreen,
   } = useStore();
 
-  // Ordered posts for current plan (persisted in localStorage); re-render when layout changes
-  const orderedPosts =
+  const baseOrderedPosts =
     currentPlan && posts.length > 0
       ? getPlanPostOrder(currentPlan.id, posts.map((p) => p.id))
         .map((id) => posts.find((p) => p.id === id))
         .filter((p): p is Post => !!p)
       : posts;
+
+  /** Sort posts so "Mobile" or "Occasionel" are always at the end. */
+  const orderedPosts = [...baseOrderedPosts].sort((a, b) => {
+    const isA = a.name.toLowerCase().includes('mobile') || a.name.toLowerCase().includes('occasionel');
+    const isB = b.name.toLowerCase().includes('mobile') || b.name.toLowerCase().includes('occasionel');
+    if (isA && !isB) return 1;
+    if (!isA && isB) return -1;
+    return 0;
+  });
+
+  // Calculate statistics (filter-sensitive)
+  const stats = (() => {
+    const activeAssignedWorkers = workers.filter(w => {
+      const postId = assignmentMap[w.id];
+      if (!postId) return false;
+      const pt = presenceMap[w.id] ?? w.type;
+      
+      // Shift filter
+      if (shiftFilter === 'jour' && !WORKER_TYPES_JOUR.includes(pt)) return false;
+      if (shiftFilter === 'soir' && !WORKER_TYPES_SOIR.includes(pt)) return false;
+      
+      return !ATTENDANCE_PRESENCE_TYPES.has(pt);
+    });
+
+    let pic = 0;
+    let met = 0;
+    let others = 0;
+
+    activeAssignedWorkers.forEach(w => {
+      const postId = assignmentMap[w.id];
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+      const n = post.name.toUpperCase();
+      if (n.includes('PIC')) pic++;
+      else if (n.includes('MET')) met++;
+      else others++;
+    });
+
+    return { pic, met, others, total: activeAssignedWorkers.length };
+  })();
   const lockedPostIds = currentPlan ? getPlanLockedPosts(currentPlan.id) : new Set<string>();
   void planLayoutVersion[currentPlan ? 'global' : '']; // subscribe for re-renders (layout is shared across plans)
 
@@ -1100,74 +1139,103 @@ export default function PlanManagement() {
   };
 
   return (
-    <div className={`w-full flex flex-col bg-gray-50 ${isFullScreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(100vh-130px)]'}`}>
+    <div className={`w-full flex flex-col bg-gray-50 ${isFullScreen ? 'h-[calc(100vh-20px)]' : 'h-[calc(100vh-130px)]'}`}>
       {/* Header */}
-      <div className="bg-white shadow-sm border-b px-6 py-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-gray-900">
-              {currentPlan ? currentPlan.name : 'Aucun plan sélectionné'}
-            </h1>
-            {currentPlan && (
-              <span className="text-sm text-gray-500">
-                {formatLocalDate(currentPlan.date)}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center space-x-4">
-            {user?.canEdit && currentPlan && lastPlanAction && (
+      {!isFullScreen && (
+        <div className="bg-white shadow-sm border-b px-6 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-6">
+              <div className="flex flex-col">
+                <h1 className="text-2xl font-bold text-gray-900 leading-tight">
+                  {currentPlan ? currentPlan.name : 'Aucun plan sélectionné'}
+                </h1>
+                {currentPlan && (
+                  <span className="text-sm text-gray-500">
+                    {formatLocalDate(currentPlan.date)}
+                  </span>
+                )}
+              </div>
+
+              {currentPlan && (
+                <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm space-x-4">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] uppercase font-bold text-gray-400">PIC</span>
+                    <span className="text-sm font-bold text-blue-600">{stats.pic}</span>
+                  </div>
+                  <div className="w-px h-6 bg-gray-200" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] uppercase font-bold text-gray-400">MET</span>
+                    <span className="text-sm font-bold text-indigo-600">{stats.met}</span>
+                  </div>
+                  <div className="w-px h-6 bg-gray-200" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] uppercase font-bold text-gray-400">Others</span>
+                    <span className="text-sm font-bold text-gray-600">{stats.others}</span>
+                  </div>
+                  <div className="w-px h-6 bg-gray-200" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] uppercase font-bold text-gray-400">Total</span>
+                    <span className="text-sm font-bold text-emerald-600">{stats.total}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-4">
+              {user?.canEdit && currentPlan && lastPlanAction && (
+                <button
+                  type="button"
+                  onClick={handleUndoPlan}
+                  className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 transition-colors"
+                  title="Annuler la dernière action"
+                >
+                  Annuler l&apos;action
+                </button>
+              )}
+              {currentPlan && (
+                <Link
+                  to="/replacements"
+                  className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition-colors"
+                >
+                  Voir remplacements
+                </Link>
+              )}
+              {currentPlan && (
+                <Link
+                  to={`/premium-state?planId=${currentPlan.id}`}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 shadow-sm transition-colors"
+                >
+                  État de Prime
+                </Link>
+              )}
               <button
-                type="button"
-                onClick={handleUndoPlan}
-                className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700"
-                title="Annuler la dernière action"
+                onClick={() => setShowPlanModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
-                Annuler l&apos;action
+                {currentPlan ? 'Gérer les Plans' : 'Créer un Plan'}
               </button>
-            )}
-            {currentPlan && (
-              <Link
-                to="/replacements"
-                className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700"
-              >
-                Voir remplacements
-              </Link>
-            )}
-            {currentPlan && (
-              <Link
-                to={`/premium-state?planId=${currentPlan.id}`}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 shadow-sm"
-              >
-                État de Prime
-              </Link>
-            )}
-            <button
-              onClick={() => setShowPlanModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              {currentPlan ? 'Gérer les Plans' : 'Créer un Plan'}
-            </button>
-            {user?.canEdit && currentPlan && (
-              <button
-                onClick={async () => {
-                  if (window.confirm(`Êtes-vous sûr de vouloir réinitialiser le plan « ${currentPlan.name} » ? Toutes les assignations et postes à combler seront supprimés.`)) {
-                    try {
-                      const { resetPlan } = useStore.getState();
-                      await resetPlan(currentPlan.id);
-                    } catch (error: any) {
-                      alert(error.message || 'Échec de la réinitialisation du plan');
+              {user?.canEdit && currentPlan && (
+                <button
+                  onClick={async () => {
+                    if (window.confirm(`Êtes-vous sûr de vouloir réinitialiser le plan « ${currentPlan.name} » ? Toutes les assignations et postes à combler seront supprimés.`)) {
+                      try {
+                        const { resetPlan } = useStore.getState();
+                        await resetPlan(currentPlan.id);
+                      } catch (error: any) {
+                        alert(error.message || 'Échec de la réinitialisation du plan');
+                      }
                     }
-                  }
-                }}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm"
-                title="Réinitialiser le plan à son état initial"
-              >
-                Réinitialiser le Plan
-              </button>
-            )}
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm transition-colors"
+                  title="Réinitialiser le plan à son état initial"
+                >
+                  Réinitialiser le Plan
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content - Two Panels */}
       {currentPlan ? (

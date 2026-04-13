@@ -58,8 +58,22 @@ export default function WorkerCard({
     WorkerType.SOIR
   ].includes(displayType);
 
+  const isMobileOrOccasional = [
+    WorkerType.MOBILITE_DU_JOUR,
+    WorkerType.MOBILITE_DU_SOIR,
+    WorkerType.OCCASIONEL_DU_JOUR,
+    WorkerType.OCCASIONEL_SOIR
+  ].includes(displayType);
+
   const isMisplacedPermanent = 
     isPermanent &&
+    currentPostId && 
+    worker.originalPostId && 
+    currentPostId !== worker.originalPostId && 
+    currentPostId !== 'presence';
+
+  const isMisplacedOther = 
+    isMobileOrOccasional &&
     currentPostId && 
     worker.originalPostId && 
     currentPostId !== worker.originalPostId && 
@@ -77,9 +91,11 @@ export default function WorkerCard({
     transition,
     opacity: isDragging ? 0.5 : 1,
     backgroundColor: hexToRgba(typeColor, 0.15),
-    borderColor: isMisplacedPermanent ? '#FF0000' : typeColor,
-    borderWidth: isMisplacedPermanent ? '3px' : '1px',
-    boxShadow: isMisplacedPermanent ? '0 0 8px rgba(255, 0, 0, 0.6)' : undefined,
+    borderColor: isMisplacedPermanent ? '#FF0000' : (isMisplacedOther ? '#0000FF' : typeColor),
+    borderWidth: (isMisplacedPermanent || isMisplacedOther) ? '3px' : '1px',
+    boxShadow: isMisplacedPermanent 
+      ? '0 0 8px rgba(255, 0, 0, 0.6)' 
+      : (isMisplacedOther ? '0 0 8px rgba(0, 0, 255, 0.6)' : undefined),
   };
 
   const postName = worker.originalPost?.name ?? '-';
