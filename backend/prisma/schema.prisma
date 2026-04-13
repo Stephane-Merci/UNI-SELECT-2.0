@@ -48,6 +48,7 @@ model Post {
   updatedAt           DateTime                @updatedAt
   isMachineryFaulty   Boolean                 @default(false)
   needsMachinery      Boolean                 @default(false)
+  machineryStatus     String                  @default("GOOD")
   assignments         Assignment[]
   interactions        AssignmentInteraction[]
   bookingAssignments  BookingAssignment[]
