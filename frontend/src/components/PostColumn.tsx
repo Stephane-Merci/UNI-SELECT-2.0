@@ -21,8 +21,6 @@ interface PostColumnProps {
   wrapperClassName?: string;
   /** Plan page: when set, only the header is draggable for reordering the post (not the workers). */
   dragHandleProps?: { attributes: Record<string, unknown>; listeners: Record<string, unknown> };
-  /** Force disable blinking for all workers in this column. */
-  disableBlinking?: boolean;
 }
 
 export default function PostColumn({
@@ -36,7 +34,6 @@ export default function PostColumn({
   onLockToggle,
   wrapperClassName,
   dragHandleProps,
-  disableBlinking
 }: PostColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: post.id,
@@ -125,7 +122,6 @@ export default function PostColumn({
                 worker={worker}
                 dragId={`${POST_DRAG_PREFIX}${post.id}${POST_DRAG_SEP}${worker.id}`}
                 currentPostId={post.id}
-                disableBlinking={disableBlinking}
               />
             ))}
             {unfilledPositions.map((up) => (
