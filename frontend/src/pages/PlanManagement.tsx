@@ -701,11 +701,7 @@ export default function PlanManagement() {
       : WORKER_TYPES_SOIR.includes(worker.type)
         ? 'soir'
         : null;
-
-    if (!workerShift) {
-      console.warn('Replacement check skipped: Worker type does not belong to jour or soir shifts.', worker);
-      return;
-    }
+    if (!workerShift) return;
 
     const currentAssignments = useStore.getState().assignments.filter(a => a.planId === currentPlan?.id);
     const currentAssignmentMap: Record<string, string> = {};
@@ -715,7 +711,7 @@ export default function PlanManagement() {
       (w) => w.id !== movedWorkerId && currentAssignmentMap[w.id] === previousPostId
     );
     const activeSameShiftStillOnPost = workersStillOnPost.filter((w) => {
-      const presence = presenceMap[w.id] ?? w.type;
+      const presence = presenceMap[w.id] || w.type;
       const isActive = !ATTENDANCE_PRESENCE_TYPES.has(presence);
       return isActive && (
         workerShift === 'jour'
@@ -728,99 +724,81 @@ export default function PlanManagement() {
       try {
         const bookingsRes = await apiClient.get<Booking[]>('/bookings');
         const bookingsList = bookingsRes.data ?? [];
-        
-        const pDate = normalizeToUTC(currentPlan?.date);
-        const pDateStr = pDate?.toISOString().split('T')[0];
-
-        // Try to find booking by date, then fallback to active booking, then fallback to first booking
+        const planDate = currentPlan?.date ? normalizeToUTC(currentPlan.date)?.getTime() : null;
         const chosenBooking =
-          (pDateStr ? bookingsList.find((b) => normalizeToUTC(b.effectiveDate)?.toISOString().split('T')[0] === pDateStr) : null) ?? 
-          bookingsList.find(b => b.isActive) ??
-          bookingsList[0];
-
-        let suggestionIds: string[] = [];
+          planDate != null
+            ? bookingsList.find((b) => normalizeToUTC(b.effectiveDate)?.getTime() === planDate) ?? bookingsList[0]
+            : bookingsList[0];
         if (chosenBooking) {
-          try {
-            const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
-            const replList = replRes.data ?? [];
-            const row = replList.find((r) => r.postId === previousPostId);
-            if (row) {
-              const ids = workerShift === 'jour'
+          const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
+          const replList = replRes.data ?? [];
+          const row = replList.find((r) => r.postId === previousPostId);
+          if (row) {
+            const ids =
+              workerShift === 'jour'
                 ? [row.replacement1WorkerId, row.replacement2WorkerId, row.replacement3WorkerId, row.replacement4WorkerId]
                 : [row.replacement5WorkerId, row.replacement6WorkerId, row.replacement7WorkerId, row.replacement8WorkerId];
-              suggestionIds = ids.filter((id): id is string => !!id && id !== '');
-            }
-          } catch (e) {
-            console.error('Failed to fetch specific replacements, falling back to all workers:', e);
-          }
-        }
+            const optionIds = (ids.filter((id): id is string => !!id) as string[]).filter(Boolean);
 
-        const planDateStr = currentPlan?.date ? formatLocalDate(currentPlan.date, 'en-US', { weekday: 'long' }).toUpperCase() : '';
+            const planDateStr = currentPlan?.date ? formatLocalDate(currentPlan.date, 'en-US', { weekday: 'long' }).toUpperCase() : '';
 
-        const mapWorkerToOption = (w: Worker) => {
-          const presence = presenceMap[w.id] ?? w.type;
-          const isAbsentZone = ATTENDANCE_PRESENCE_TYPES.has(presence);
-          const isPreRetraiteToday = w.preRetraiteDay === planDateStr;
-          const assignedPostId = currentAssignmentMap[w.id];
+            const options = optionIds
+              .map((id) => {
+                const w = workers.find((work) => work.id === id);
+                if (!w) return null;
 
-          let leavesReplacementPost = false;
-          if (assignedPostId) {
-            const wShift: 'jour' | 'soir' | null = WORKER_TYPES_JOUR.includes(w.type) ? 'jour' : WORKER_TYPES_SOIR.includes(w.type) ? 'soir' : null;
-            if (wShift === workerShift) {
-              const othersOnPost = workers.filter(other => other.id !== w.id && currentAssignmentMap[other.id] === assignedPostId);
-              const activeShiftOthers = othersOnPost.filter(o => {
-                const p = presenceMap[o.id] ?? o.type;
-                return !ATTENDANCE_PRESENCE_TYPES.has(p) && (wShift === 'jour' ? WORKER_TYPES_JOUR.includes(o.type) : WORKER_TYPES_SOIR.includes(o.type));
+                const presence = presenceMap[w.id] || w.type;
+                const isAbsentZone = [
+                  WorkerType.ABSENT, WorkerType.VACANCES, WorkerType.INVALIDITE,
+                  WorkerType.PRERETRAITE, WorkerType.CONGE_PARENTAL, WorkerType.LIBERATION_EXTERNE
+                ].includes(presence);
+
+                const isPreRetraiteToday = w.preRetraiteDay === planDateStr;
+                const assignedPostId = currentAssignmentMap[w.id];
+
+                let leavesReplacementPost = false;
+                if (assignedPostId) {
+                  const wShift: 'jour' | 'soir' | null = WORKER_TYPES_JOUR.includes(w.type) ? 'jour' : WORKER_TYPES_SOIR.includes(w.type) ? 'soir' : null;
+                  if (wShift) {
+                    const othersOnPost = workers.filter(other => other.id !== w.id && currentAssignmentMap[other.id] === assignedPostId);
+                    const activeShiftOthers = othersOnPost.filter(o => {
+                      const p = presenceMap[o.id] || o.type;
+                      return !ATTENDANCE_PRESENCE_TYPES.has(p) && (wShift === 'jour' ? WORKER_TYPES_JOUR.includes(o.type) : WORKER_TYPES_SOIR.includes(o.type));
+                    });
+                    if (activeShiftOthers.length === 0) {
+                      leavesReplacementPost = replList.some(r => r.postId === assignedPostId && (wShift === 'jour' ? !!(r.replacement1WorkerId || r.replacement2WorkerId || r.replacement3WorkerId || r.replacement4WorkerId) : !!(r.replacement5WorkerId || r.replacement6WorkerId || r.replacement7WorkerId || r.replacement8WorkerId)));
+                    }
+                  }
+                }
+
+                const assignedElsewhere = !!assignedPostId && assignedPostId !== previousPostId;
+
+                return {
+                  id: w.id,
+                  name: w.name,
+                  anciennete: w.anciennete,
+                  isAbsentZone,
+                  isPreRetraiteToday,
+                  assignedElsewhere,
+                  leavesReplacementPost,
+                  assignedPostName: assignedElsewhere ? posts.find(p => p.id === assignedPostId)?.name : null
+                };
+              })
+              .filter((opt): opt is NonNullable<typeof opt> => !!opt);
+
+            if (options.length > 0) {
+              const post = posts.find((p) => p.id === previousPostId);
+              setReplacementPrompt({
+                postId: previousPostId,
+                postName: post?.name ?? previousPostId,
+                workerName: worker.name,
+                workerAnciennete: worker.anciennete,
+                shift: workerShift,
+                options,
               });
-              if (activeShiftOthers.length === 0) {
-                leavesReplacementPost = true;
-              }
+              setReplacementPromptSelectedId(options.find(o => !o.assignedElsewhere && !o.isAbsentZone && !o.isPreRetraiteToday && !o.leavesReplacementPost)?.id ?? options[0]?.id ?? null);
             }
           }
-
-          const assignedElsewhere = !!assignedPostId && assignedPostId !== previousPostId;
-
-          return {
-            id: w.id,
-            name: w.name,
-            anciennete: w.anciennete,
-            isAbsentZone,
-            isPreRetraiteToday,
-            assignedElsewhere,
-            leavesReplacementPost,
-            assignedPostName: assignedElsewhere ? posts.find(p => p.id === assignedPostId)?.name : null
-          };
-        };
-
-        const suggestedOptions = suggestionIds
-          .map(id => workers.find(w => w.id === id))
-          .filter((w): w is Worker => !!w)
-          .map(mapWorkerToOption);
-
-        let finalOptions = suggestedOptions;
-        
-        if (finalOptions.length === 0) {
-          finalOptions = workers
-            .filter(w => {
-              const wShift = WORKER_TYPES_JOUR.includes(w.type) ? 'jour' : WORKER_TYPES_SOIR.includes(w.type) ? 'soir' : null;
-              return wShift === workerShift && w.id !== movedWorkerId;
-            })
-            .map(mapWorkerToOption)
-            .sort((a, b) => a.anciennete.localeCompare(b.anciennete, 'fr', { numeric: true }))
-            .slice(0, 50); 
-        }
-
-        if (finalOptions.length > 0) {
-          const post = posts.find((p) => p.id === previousPostId);
-          setReplacementPrompt({
-            postId: previousPostId,
-            postName: post?.name ?? previousPostId,
-            workerName: worker.name,
-            workerAnciennete: worker.anciennete,
-            shift: workerShift,
-            options: finalOptions,
-          });
-          setReplacementPromptSelectedId(finalOptions.find(o => !o.assignedElsewhere && !o.isAbsentZone && !o.isPreRetraiteToday && !o.leavesReplacementPost)?.id ?? finalOptions[0]?.id ?? null);
         }
       } catch (e) {
         console.error('Replacement check failed:', e);
@@ -987,10 +965,16 @@ export default function PlanManagement() {
     try {
       const bookingsRes = await apiClient.get<Booking[]>('/bookings');
       const bookingsList = bookingsRes.data ?? [];
-      const planDate = currentPlan.date ? new Date(currentPlan.date).getTime() : null;
+      const planDate = currentPlan.date ? normalizeToUTC(currentPlan.date) : null;
+      const isSameUtcDay = (a: Date | null, b: Date | null) =>
+        !!a &&
+        !!b &&
+        a.getUTCFullYear() === b.getUTCFullYear() &&
+        a.getUTCMonth() === b.getUTCMonth() &&
+        a.getUTCDate() === b.getUTCDate();
       const chosenBooking =
-        planDate != null
-          ? bookingsList.find((b) => new Date(b.effectiveDate).getTime() === planDate) ?? bookingsList[0]
+        planDate
+          ? bookingsList.find((b) => isSameUtcDay(normalizeToUTC(b.effectiveDate), planDate)) ?? bookingsList[0]
           : bookingsList[0];
       if (chosenBooking) {
         const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
@@ -1113,7 +1097,8 @@ export default function PlanManagement() {
           setShowMachineryPopup(true);
         }
       }
-    } catch {
+    } catch (error) {
+      console.error('Auto-assign replacement popup failed:', error);
       setShowMachineryPopup(true);
     }
   };
