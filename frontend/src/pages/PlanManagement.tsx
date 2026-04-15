@@ -1039,7 +1039,12 @@ export default function PlanManagement() {
       const pt = presenceMap[w.id] ?? w.type;
       return visibleGroupTypes.includes(pt);
     });
-    const toAssign = visibleWorkers;
+    // Auto-assign excludes occasionnels (jour/soir) by requirement.
+    const toAssign = visibleWorkers.filter(
+      (w) =>
+        w.type !== WorkerType.OCCASIONEL_DU_JOUR &&
+        w.type !== WorkerType.OCCASIONEL_SOIR
+    );
     if (REPLACEMENT_DEBUG) {
       console.groupCollapsed('[ReplacementDebug] autoAssign:start');
       console.log('currentPlan', currentPlan ? { id: currentPlan.id, date: currentPlan.date, name: currentPlan.name } : null);

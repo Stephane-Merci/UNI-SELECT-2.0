@@ -146,18 +146,13 @@ export default function MachineryCheckup() {
                     <h2 className="text-xl font-bold text-gray-800">{post.name}</h2>
                     <p className="text-sm text-gray-500 italic">{post.description || 'Sans description'}</p>
                   </div>
-                  {post.machineryStatus === 'FAULTY' && (
-                    <span className="px-3 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full animate-pulse border border-red-200">
-                      DÉJÀ SIGNALÉ DÉFECTUEUX
-                    </span>
-                  )}
                 </div>
                 
                 <div className="divide-y divide-gray-100">
                   {assignedWorkers.length > 0 ? (
                     assignedWorkers.map((worker) => {
                       const check = machineryChecks.find(
-                        (c) => c.postId === post.id && c.planId === currentPlan.id
+                        (c) => c.postId === post.id && c.planId === currentPlan.id && c.workerId === worker.id
                       );
                       const hasBeenChecked = !!check;
                       const currentStatus = check?.status || 'UNKNOWN';

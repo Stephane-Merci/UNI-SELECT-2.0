@@ -550,7 +550,7 @@ export const useStore = create<AppState>((set, get) => ({
       const response = await apiClient.post('/machinery/check', data);
       set((state) => {
         const filtered = state.machineryChecks.filter(
-          (c) => !(c.planId === data.planId && c.postId === data.postId)
+          (c) => !(c.planId === data.planId && c.postId === data.postId && c.workerId === data.workerId)
         );
         return { machineryChecks: [...filtered, response.data] };
       });

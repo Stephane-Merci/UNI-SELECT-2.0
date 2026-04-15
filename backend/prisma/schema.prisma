@@ -220,9 +220,10 @@ model MachineryCheck {
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
-  @@unique([planId, postId])
+  @@unique([planId, postId, workerId])
   @@index([planId])
   @@index([postId])
+  @@index([workerId])
 }
 
 enum WorkerType {

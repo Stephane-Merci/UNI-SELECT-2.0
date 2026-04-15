@@ -42,13 +42,13 @@ router.post('/check', async (req, res) => {
     
     const dbCheck = await prisma.machineryCheck.upsert({
       where: {
-        planId_postId: {
+        planId_postId_workerId: {
           planId: data.planId,
           postId: data.postId,
+          workerId: data.workerId,
         },
       },
       update: {
-        workerId: data.workerId,
         isDone: true,
         isFaulty: data.status === 'FAULTY',
         updatedAt: new Date(),
@@ -72,26 +72,6 @@ router.post('/check', async (req, res) => {
       status: dbCheck.isDone ? (dbCheck.isFaulty ? 'FAULTY' : 'GOOD') : 'UNKNOWN',
       checkedAt: dbCheck.updatedAt
     };
-
-    // If the status is FAULTY, update the post's global machinery status
-    if (data.status === 'FAULTY') {
-      const updatedPost = await prisma.post.update({
-        where: { id: data.postId },
-        data: { isMachineryFaulty: true, machineryStatus: 'FAULTY' },
-      });
-      
-      // Emit real-time update for post
-      io.emit('post-updated', { post: updatedPost, room: 'main' });
-    }
-        // If it was FAULTY, maybe we keep it FAULTY until a manager manually fixes it in Admin?
-        // Actually, the user says: "From there, for future plans created, in the machinery check page, faulty machineries should display as faulty unless changed by the manager there in that page or in the administration post table page"
-        // So if a worker says GOOD, it doesn't necessarily mean the FAULTY state in Admin is gone.
-        // Wait, the user says: "If the feedback is falsy machinery, it should show in the admin page... From there, for future plans created... faulty machineries should display as faulty unless changed by the manager"
-        // This implies that once it's FAULTY, it stays FAULTY until a manager changes it.
-        // But if a worker checks it and it's GOOD *today*, should it update the global status?
-        // "unless changed by the manager there in that page" -> "that page" is machinery check page.
-        // "unless changed by the manager there in that page" -> "that page" is machinery check page.
-        // So maybe managers CAN change it in the machinery check page too.
 
     io.emit('machinery-check-updated', { check, room: 'main' });
     res.json(check);
