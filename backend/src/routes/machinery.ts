@@ -1,6 +1,7 @@
 import express from 'express';
 import { prisma, io } from '../index';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 
 const router = express.Router();
 
@@ -39,32 +40,37 @@ router.get('/plan/:planId', async (req, res) => {
 router.post('/check', async (req, res) => {
   try {
     const data = machineryCheckSchema.parse(req.body);
-    
-    const dbCheck = await prisma.machineryCheck.upsert({
+
+    const include = { post: true, worker: true } as const;
+    const write = {
+      isDone: true,
+      isFaulty: data.status === 'FAULTY',
+      updatedAt: new Date(),
+    };
+
+    const existing = await prisma.machineryCheck.findFirst({
       where: {
-        planId_postId_workerId: {
-          planId: data.planId,
-          postId: data.postId,
-          workerId: data.workerId,
-        },
-      },
-      update: {
-        isDone: true,
-        isFaulty: data.status === 'FAULTY',
-        updatedAt: new Date(),
-      },
-      create: {
         planId: data.planId,
         postId: data.postId,
         workerId: data.workerId,
-        isDone: true,
-        isFaulty: data.status === 'FAULTY',
       },
-      include: {
-        post: true,
-        worker: true,
-      }
     });
+
+    const dbCheck = existing
+      ? await prisma.machineryCheck.update({
+          where: { id: existing.id },
+          data: write,
+          include,
+        })
+      : await prisma.machineryCheck.create({
+          data: {
+            planId: data.planId,
+            postId: data.postId,
+            workerId: data.workerId,
+            ...write,
+          },
+          include,
+        });
 
     // Map to frontend format
     const check = {
@@ -78,6 +84,20 @@ router.post('/check', async (req, res) => {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
+    }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      const target = error.meta?.target;
+      const targetStr = Array.isArray(target) ? target.join(', ') : String(target ?? '');
+      if (targetStr.includes('planId') && targetStr.includes('postId') && !targetStr.includes('workerId')) {
+        return res.status(503).json({
+          error:
+            'La base de données impose encore une seule inspection par poste (ancienne contrainte). Exécutez la migration Prisma sur la base utilisée par ce serveur (UNIQUE planId+postId+workerId), ou appliquez le SQL du fichier migrations/20260416120000_machinery_check_unique_per_worker_fix/migration.sql sur la même DATABASE_URL que Render.',
+          code: 'MACHINERY_DB_CONSTRAINT_STALE',
+        });
+      }
     }
     res.status(500).json({ error: 'Failed to update machinery check' });
   }
