@@ -396,6 +396,7 @@ function PostsPanel({
 }
 
 export default function PlanManagement() {
+  const REPLACEMENT_DEBUG = true;
   const {
     workers,
     posts,
@@ -696,12 +697,23 @@ export default function PlanManagement() {
   };
 
   const checkAndPromptReplacement = async (worker: Worker, previousPostId: string, movedWorkerId: string) => {
+    if (REPLACEMENT_DEBUG) {
+      console.groupCollapsed('[ReplacementDebug] checkAndPromptReplacement:start');
+      console.log('worker', { id: worker.id, name: worker.name, type: worker.type, anciennete: worker.anciennete });
+      console.log('previousPostId', previousPostId);
+      console.log('movedWorkerId', movedWorkerId);
+      console.log('currentPlan', currentPlan ? { id: currentPlan.id, date: currentPlan.date, name: currentPlan.name } : null);
+      console.groupEnd();
+    }
     const workerShift: 'jour' | 'soir' | null = WORKER_TYPES_JOUR.includes(worker.type)
       ? 'jour'
       : WORKER_TYPES_SOIR.includes(worker.type)
         ? 'soir'
         : null;
-    if (!workerShift) return;
+    if (!workerShift) {
+      if (REPLACEMENT_DEBUG) console.log('[ReplacementDebug] stop: worker has no jour/soir shift', worker.id);
+      return;
+    }
 
     const currentAssignments = useStore.getState().assignments.filter(a => a.planId === currentPlan?.id);
     const currentAssignmentMap: Record<string, string> = {};
@@ -720,6 +732,14 @@ export default function PlanManagement() {
       );
     });
 
+    if (REPLACEMENT_DEBUG) {
+      console.groupCollapsed('[ReplacementDebug] checkAndPromptReplacement:post-state');
+      console.log('workerShift', workerShift);
+      console.log('workersStillOnPost', workersStillOnPost.map((w) => ({ id: w.id, name: w.name, type: w.type })));
+      console.log('activeSameShiftStillOnPostCount', activeSameShiftStillOnPost.length);
+      console.groupEnd();
+    }
+
     if (activeSameShiftStillOnPost.length === 0) {
       try {
         const bookingsRes = await apiClient.get<Booking[]>('/bookings');
@@ -735,6 +755,14 @@ export default function PlanManagement() {
           planDate
             ? bookingsList.find((b) => isSameUtcDay(normalizeToUTC(b.effectiveDate), planDate)) ?? bookingsList[0]
             : bookingsList[0];
+        if (REPLACEMENT_DEBUG) {
+          console.groupCollapsed('[ReplacementDebug] checkAndPromptReplacement:booking-selection');
+          console.log('planDate(UTC)', planDate?.toISOString() ?? null);
+          console.log('bookingsCount', bookingsList.length);
+          console.log('bookingsSummary', bookingsList.map((b: any) => ({ id: b.id, effectiveDate: b.effectiveDate, isActive: (b as any).isActive ?? false, name: b.name })));
+          console.log('chosenBooking', chosenBooking ? { id: chosenBooking.id, effectiveDate: chosenBooking.effectiveDate, name: chosenBooking.name } : null);
+          console.groupEnd();
+        }
         if (chosenBooking) {
           let replList: BookingReplacement[] = [];
           try {
@@ -752,6 +780,20 @@ export default function PlanManagement() {
             }
           }
           const row = replList.find((r) => r.postId === previousPostId);
+          if (REPLACEMENT_DEBUG) {
+            console.groupCollapsed('[ReplacementDebug] checkAndPromptReplacement:replacement-row');
+            console.log('replListCount', replList.length);
+            console.log('previousPostId', previousPostId);
+            console.log('rowFound', !!row);
+            if (row) {
+              console.log('row', {
+                postId: row.postId,
+                jour: [row.replacement1WorkerId, row.replacement2WorkerId, row.replacement3WorkerId, row.replacement4WorkerId],
+                soir: [row.replacement5WorkerId, row.replacement6WorkerId, row.replacement7WorkerId, row.replacement8WorkerId],
+              });
+            }
+            console.groupEnd();
+          }
           if (row) {
             const ids =
               workerShift === 'jour'
@@ -805,6 +847,22 @@ export default function PlanManagement() {
               })
               .filter((opt): opt is NonNullable<typeof opt> => !!opt);
 
+            if (REPLACEMENT_DEBUG) {
+              console.groupCollapsed('[ReplacementDebug] checkAndPromptReplacement:options');
+              console.log('optionIdsRaw', optionIds);
+              console.log('optionsCount', options.length);
+              console.log('options', options.map((o) => ({
+                id: o.id,
+                name: o.name,
+                isAbsentZone: o.isAbsentZone,
+                isPreRetraiteToday: o.isPreRetraiteToday,
+                assignedElsewhere: o.assignedElsewhere,
+                leavesReplacementPost: o.leavesReplacementPost,
+                assignedPostName: o.assignedPostName ?? null,
+              })));
+              console.groupEnd();
+            }
+
             if (options.length > 0) {
               const post = posts.find((p) => p.id === previousPostId);
               setReplacementPrompt({
@@ -816,12 +874,17 @@ export default function PlanManagement() {
                 options,
               });
               setReplacementPromptSelectedId(options.find(o => !o.assignedElsewhere && !o.isAbsentZone && !o.isPreRetraiteToday && !o.leavesReplacementPost)?.id ?? options[0]?.id ?? null);
+              if (REPLACEMENT_DEBUG) console.log('[ReplacementDebug] popup opened (checkAndPromptReplacement)', { postId: previousPostId, workerId: worker.id, optionsCount: options.length });
+            } else if (REPLACEMENT_DEBUG) {
+              console.log('[ReplacementDebug] no popup: options empty after filtering');
             }
           }
         }
       } catch (e) {
         console.error('Replacement check failed:', e);
       }
+    } else if (REPLACEMENT_DEBUG) {
+      console.log('[ReplacementDebug] no popup: post still has active same-shift worker(s)', { count: activeSameShiftStillOnPost.length });
     }
   };
 
@@ -974,6 +1037,13 @@ export default function PlanManagement() {
       return visibleGroupTypes.includes(pt);
     });
     const toAssign = visibleWorkers;
+    if (REPLACEMENT_DEBUG) {
+      console.groupCollapsed('[ReplacementDebug] autoAssign:start');
+      console.log('currentPlan', currentPlan ? { id: currentPlan.id, date: currentPlan.date, name: currentPlan.name } : null);
+      console.log('visibleWorkersCount', visibleWorkers.length);
+      console.log('toAssignCount', toAssign.length);
+      console.groupEnd();
+    }
 
     const freshAssignmentMap: Record<string, string> = { ...assignmentMap };
     for (const w of toAssign) {
@@ -995,6 +1065,14 @@ export default function PlanManagement() {
         planDate
           ? bookingsList.find((b) => isSameUtcDay(normalizeToUTC(b.effectiveDate), planDate)) ?? bookingsList[0]
           : bookingsList[0];
+      if (REPLACEMENT_DEBUG) {
+        console.groupCollapsed('[ReplacementDebug] autoAssign:booking-selection');
+        console.log('planDate(UTC)', planDate?.toISOString() ?? null);
+        console.log('bookingsCount', bookingsList.length);
+        console.log('bookingsSummary', bookingsList.map((b: any) => ({ id: b.id, effectiveDate: b.effectiveDate, isActive: (b as any).isActive ?? false, name: b.name })));
+        console.log('chosenBooking', chosenBooking ? { id: chosenBooking.id, effectiveDate: chosenBooking.effectiveDate, name: chosenBooking.name } : null);
+        console.groupEnd();
+      }
       if (chosenBooking) {
         let replList: BookingReplacement[] = [];
         try {
@@ -1011,6 +1089,12 @@ export default function PlanManagement() {
           }
         }
         const items: any[] = [];
+        if (REPLACEMENT_DEBUG) {
+          console.groupCollapsed('[ReplacementDebug] autoAssign:replacement-list');
+          console.log('replListCount', replList.length);
+          console.log('replPostIds', replList.map((r) => r.postId));
+          console.groupEnd();
+        }
         for (const r of replList) {
           const postId = r.postId;
           const workersOnPost = workers.filter((w) => w.originalPostId === postId);
@@ -1068,6 +1152,15 @@ export default function PlanManagement() {
                 selectedId: options.find(o => !o.assignedElsewhere && !o.isAbsentZone && !o.isPreRetraiteToday && !o.leavesReplacementPost)?.id ?? options[0].id
               });
             }
+            if (REPLACEMENT_DEBUG) {
+              console.log('[ReplacementDebug] autoAssign:jour-eval', {
+                postId,
+                postName,
+                jourWorkers: jourWorkers.length,
+                activeJourWorkers: activeJourWorkers.length,
+                optionsCount: options.length,
+              });
+            }
           }
 
           const soirWorkers = workersOnPost.filter((w) => WORKER_TYPES_SOIR.includes(w.type));
@@ -1120,11 +1213,22 @@ export default function PlanManagement() {
                 selectedId: options.find(o => !o.assignedElsewhere && !o.isAbsentZone && !o.isPreRetraiteToday && !o.leavesReplacementPost)?.id ?? options[0].id
               });
             }
+            if (REPLACEMENT_DEBUG) {
+              console.log('[ReplacementDebug] autoAssign:soir-eval', {
+                postId,
+                postName,
+                soirWorkers: soirWorkers.length,
+                activeSoirWorkers: activeSoirWorkers.length,
+                optionsCount: options.length,
+              });
+            }
           }
         }
         if (items.length > 0) {
           setAutoAssignReplacementPrompt({ items });
+          if (REPLACEMENT_DEBUG) console.log('[ReplacementDebug] popup opened (autoAssign)', { itemsCount: items.length, items: items.map((i) => ({ postId: i.postId, shift: i.shift, optionsCount: i.options.length })) });
         } else {
+          if (REPLACEMENT_DEBUG) console.log('[ReplacementDebug] no popup (autoAssign): no qualifying replacement items');
           setShowMachineryPopup(true);
         }
       }
