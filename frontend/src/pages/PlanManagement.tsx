@@ -691,6 +691,7 @@ export default function PlanManagement() {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const workerId = getWorkerIdFromDragId(String(active.id));
+    const worker = workerId ? workers.find((w) => w.id === workerId) ?? null : null;
     setActiveWorker(worker);
   };
 
