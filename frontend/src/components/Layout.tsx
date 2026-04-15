@@ -91,7 +91,7 @@ export default function Layout() {
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setDropdownOpen(false)}
                       >
-                        Checkup Machinerie
+                        Inspection des engins roulant
                       </Link>
                       <Link
                         to="/admin"

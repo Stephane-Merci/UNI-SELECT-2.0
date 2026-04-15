@@ -83,7 +83,7 @@ export default function MachineryCheckup() {
   if (!currentPlan) {
     return (
       <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl shadow-sm border border-gray-100">
-        <p className="text-gray-500 italic">Veuillez sélectionner un plan dans le Plan de travail pour voir le checkup machinerie.</p>
+        <p className="text-gray-500 italic">Veuillez sélectionner un plan dans le Plan de travail pour voir l&apos;inspection des engins roulant.</p>
       </div>
     );
   }
@@ -92,7 +92,7 @@ export default function MachineryCheckup() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 print:text-black">Checkup Machinerie</h1>
+          <h1 className="text-3xl font-bold text-gray-900 print:text-black">Inspection des engins roulant</h1>
           <p className="text-gray-600 mt-1 print:text-black">Plan : <span className="font-semibold">{currentPlan.name}</span></p>
         </div>
 
@@ -231,7 +231,7 @@ export default function MachineryCheckup() {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-gray-300 mx-auto mb-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M11.423 20.25a2.25 2.25 0 0 0 4.5 0V17.25H11.423v3.00zm0-3.75h4.5m-4.5 0v-4.5h4.5v4.5m-4.5-4.5V9a2.25 2.25 0 0 1 4.5 0v3.00h-4.5zM3 17.25h3.00v3.00H3v-3.00zm0-3.75h3.00v3.00H3v-3.00zm0-3.75h3.00v3.00H3v-3.00zm0-3.75h3.00v3.00H3v-3.00z" />
             </svg>
-            <p className="text-gray-500">Aucun poste ne requiert de machinerie pour ce quart de travail.</p>
+            <p className="text-gray-500">Aucun poste ne requiert d&apos;inspection des engins roulant pour ce quart de travail.</p>
           </div>
         )}
       </div>
