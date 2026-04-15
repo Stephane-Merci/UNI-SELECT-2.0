@@ -751,15 +751,18 @@ export default function PlanManagement() {
           a.getUTCFullYear() === b.getUTCFullYear() &&
           a.getUTCMonth() === b.getUTCMonth() &&
           a.getUTCDate() === b.getUTCDate();
-        const chosenBooking =
-          planDate
-            ? bookingsList.find((b) => isSameUtcDay(normalizeToUTC(b.effectiveDate), planDate)) ?? bookingsList[0]
-            : bookingsList[0];
+        const activeBooking = bookingsList.find((b: any) => (b as any).isActive);
+        const dateMatchedBooking = planDate
+          ? bookingsList.find((b) => isSameUtcDay(normalizeToUTC(b.effectiveDate), planDate))
+          : undefined;
+        const chosenBooking = activeBooking ?? dateMatchedBooking ?? bookingsList[0];
         if (REPLACEMENT_DEBUG) {
           console.groupCollapsed('[ReplacementDebug] checkAndPromptReplacement:booking-selection');
           console.log('planDate(UTC)', planDate?.toISOString() ?? null);
           console.log('bookingsCount', bookingsList.length);
           console.log('bookingsSummary', bookingsList.map((b: any) => ({ id: b.id, effectiveDate: b.effectiveDate, isActive: (b as any).isActive ?? false, name: b.name })));
+          console.log('activeBooking', activeBooking ? { id: activeBooking.id, effectiveDate: activeBooking.effectiveDate, name: activeBooking.name } : null);
+          console.log('dateMatchedBooking', dateMatchedBooking ? { id: dateMatchedBooking.id, effectiveDate: dateMatchedBooking.effectiveDate, name: dateMatchedBooking.name } : null);
           console.log('chosenBooking', chosenBooking ? { id: chosenBooking.id, effectiveDate: chosenBooking.effectiveDate, name: chosenBooking.name } : null);
           console.groupEnd();
         }
@@ -1061,15 +1064,18 @@ export default function PlanManagement() {
         a.getUTCFullYear() === b.getUTCFullYear() &&
         a.getUTCMonth() === b.getUTCMonth() &&
         a.getUTCDate() === b.getUTCDate();
-      const chosenBooking =
-        planDate
-          ? bookingsList.find((b) => isSameUtcDay(normalizeToUTC(b.effectiveDate), planDate)) ?? bookingsList[0]
-          : bookingsList[0];
+      const activeBooking = bookingsList.find((b: any) => (b as any).isActive);
+      const dateMatchedBooking = planDate
+        ? bookingsList.find((b) => isSameUtcDay(normalizeToUTC(b.effectiveDate), planDate))
+        : undefined;
+      const chosenBooking = activeBooking ?? dateMatchedBooking ?? bookingsList[0];
       if (REPLACEMENT_DEBUG) {
         console.groupCollapsed('[ReplacementDebug] autoAssign:booking-selection');
         console.log('planDate(UTC)', planDate?.toISOString() ?? null);
         console.log('bookingsCount', bookingsList.length);
         console.log('bookingsSummary', bookingsList.map((b: any) => ({ id: b.id, effectiveDate: b.effectiveDate, isActive: (b as any).isActive ?? false, name: b.name })));
+        console.log('activeBooking', activeBooking ? { id: activeBooking.id, effectiveDate: activeBooking.effectiveDate, name: activeBooking.name } : null);
+        console.log('dateMatchedBooking', dateMatchedBooking ? { id: dateMatchedBooking.id, effectiveDate: dateMatchedBooking.effectiveDate, name: dateMatchedBooking.name } : null);
         console.log('chosenBooking', chosenBooking ? { id: chosenBooking.id, effectiveDate: chosenBooking.effectiveDate, name: chosenBooking.name } : null);
         console.groupEnd();
       }
