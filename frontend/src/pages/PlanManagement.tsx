@@ -825,12 +825,11 @@ export default function PlanManagement() {
               setReplacementPromptSelectedId(finalOptions.find(o => !o.assignedElsewhere && !o.isAbsentZone && !o.isPreRetraiteToday && !o.leavesReplacementPost)?.id ?? finalOptions[0]?.id ?? null);
             }
           }
+        } catch (e) {
+          console.error('Replacement check failed:', e);
         }
-      } catch (e) {
-        console.error('Replacement check failed:', e);
       }
-    }
-  };
+    };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     if (!user?.canEdit) return;
