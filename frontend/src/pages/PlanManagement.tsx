@@ -724,14 +724,33 @@ export default function PlanManagement() {
       try {
         const bookingsRes = await apiClient.get<Booking[]>('/bookings');
         const bookingsList = bookingsRes.data ?? [];
-        const planDate = currentPlan?.date ? normalizeToUTC(currentPlan.date)?.getTime() : null;
+        const planDate = currentPlan?.date ? normalizeToUTC(currentPlan.date) : null;
+        const isSameUtcDay = (a: Date | null, b: Date | null) =>
+          !!a &&
+          !!b &&
+          a.getUTCFullYear() === b.getUTCFullYear() &&
+          a.getUTCMonth() === b.getUTCMonth() &&
+          a.getUTCDate() === b.getUTCDate();
         const chosenBooking =
-          planDate != null
-            ? bookingsList.find((b) => normalizeToUTC(b.effectiveDate)?.getTime() === planDate) ?? bookingsList[0]
+          planDate
+            ? bookingsList.find((b) => isSameUtcDay(normalizeToUTC(b.effectiveDate), planDate)) ?? bookingsList[0]
             : bookingsList[0];
         if (chosenBooking) {
-          const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
-          const replList = replRes.data ?? [];
+          let replList: BookingReplacement[] = [];
+          try {
+            const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
+            replList = replRes.data ?? [];
+          } catch (primaryReplError) {
+            // Fallback: in production, date-based booking matching can be stale; retry using active booking
+            console.warn('Replacement fetch failed for matched booking, trying active booking fallback', primaryReplError);
+            const activeBooking = bookingsList.find((b: any) => (b as any).isActive);
+            if (activeBooking && activeBooking.id !== chosenBooking.id) {
+              const fallbackRes = await apiClient.get<BookingReplacement[]>(`/bookings/${activeBooking.id}/replacements`);
+              replList = fallbackRes.data ?? [];
+            } else {
+              throw primaryReplError;
+            }
+          }
           const row = replList.find((r) => r.postId === previousPostId);
           if (row) {
             const ids =
@@ -977,8 +996,20 @@ export default function PlanManagement() {
           ? bookingsList.find((b) => isSameUtcDay(normalizeToUTC(b.effectiveDate), planDate)) ?? bookingsList[0]
           : bookingsList[0];
       if (chosenBooking) {
-        const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
-        const replList = replRes.data ?? [];
+        let replList: BookingReplacement[] = [];
+        try {
+          const replRes = await apiClient.get<BookingReplacement[]>(`/bookings/${chosenBooking.id}/replacements`);
+          replList = replRes.data ?? [];
+        } catch (primaryReplError) {
+          console.warn('Auto-assign replacement fetch failed for matched booking, trying active booking fallback', primaryReplError);
+          const activeBooking = bookingsList.find((b: any) => (b as any).isActive);
+          if (activeBooking && activeBooking.id !== chosenBooking.id) {
+            const fallbackRes = await apiClient.get<BookingReplacement[]>(`/bookings/${activeBooking.id}/replacements`);
+            replList = fallbackRes.data ?? [];
+          } else {
+            throw primaryReplError;
+          }
+        }
         const items: any[] = [];
         for (const r of replList) {
           const postId = r.postId;
