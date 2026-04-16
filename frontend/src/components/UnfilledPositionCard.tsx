@@ -12,14 +12,14 @@ export default function UnfilledPositionCard({
     return (
         <div
             data-id={unfilledPosition.id}
-            className="rounded px-1 py-0.5 shadow-sm border border-gray-300 bg-gray-100 text-[10px] leading-tight w-[110px] max-w-full min-w-0 overflow-hidden group"
+            className="rounded-md px-1 py-0.5 border-2 border-black bg-gradient-to-b from-gray-200 to-gray-300 text-[10px] font-black leading-tight w-[110px] max-w-full min-w-0 overflow-hidden group shadow-[0_3px_0_0_rgba(0,0,0,0.85)]"
         >
             <div className="flex items-center justify-between gap-1 text-black">
                 <div className="flex items-center gap-1 truncate">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                     </svg>
-                    <span className="truncate">Poste à combler</span>
+                    <span className="truncate font-black">Poste à combler</span>
                 </div>
                 {onDelete && (
                     <button

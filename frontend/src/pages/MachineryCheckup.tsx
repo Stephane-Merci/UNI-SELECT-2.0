@@ -89,7 +89,7 @@ export default function MachineryCheckup() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-0">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 print:text-black">Inspection des engins roulant</h1>
@@ -132,97 +132,158 @@ export default function MachineryCheckup() {
 
       <div className="grid gap-6">
         {filteredPosts.length > 0 ? (
-          filteredPosts.map((post) => {
-            const assignedWorkers = (assignmentByPost[post.id] || []).filter(w => {
+          <>
+            <div className="print:hidden grid gap-6">
+              {filteredPosts.map((post) => {
+                const assignedWorkers = (assignmentByPost[post.id] || []).filter(w => {
                 if (shiftFilter === 'jour') return WORKER_TYPES_JOUR.includes(w.type);
                 if (shiftFilter === 'soir') return WORKER_TYPES_SOIR.includes(w.type);
                 return true;
-            });
+                });
 
-            return (
-              <div key={post.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-800">{post.name}</h2>
-                    <p className="text-sm text-gray-500 italic">{post.description || 'Sans description'}</p>
+                return (
+                  <div key={post.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                      <div>
+                        <h2 className="text-xl font-bold text-gray-800">{post.name}</h2>
+                        <p className="text-sm text-gray-500 italic">{post.description || 'Sans description'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="divide-y divide-gray-100">
+                      {assignedWorkers.length > 0 ? (
+                        assignedWorkers.map((worker, workerIdx) => {
+                          const check = machineryChecks.find(
+                            (c) => c.postId === post.id && c.planId === currentPlan.id && c.workerId === worker.id
+                          );
+                          const hasBeenChecked = !!check;
+                          const currentStatus = check?.status || 'UNKNOWN';
+
+                          // Zebra striping between workers (light grey).
+                          const zebra = workerIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60';
+                          const rowBg = hasBeenChecked ? zebra : workerIdx % 2 === 0 ? 'bg-red-50/25' : 'bg-red-50/12';
+
+                          return (
+                            <div key={worker.id} className={`px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${rowBg}`}>
+                              <div className="flex items-center gap-3">
+                                <div className={`h-10 w-10 flex items-center justify-center rounded-full font-bold uppercase ${hasBeenChecked ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                  {worker.name.charAt(0)}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-gray-900">{worker.name}</p>
+                                  <p className="text-xs text-gray-500">Matricule: {worker.anciennete}</p>
+                                </div>
+                              </div>
+        
+                              <div className="flex flex-col sm:items-end gap-2">
+                                 {!hasBeenChecked ? (
+                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                       <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+                                     </svg>
+                                     CHECKUP REQUIS
+                                   </span>
+                                 ) : (
+                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
+                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                       <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4.006-5.503Z" clipRule="evenodd" />
+                                     </svg>
+                                     CHECKUP EFFECTUÉ
+                                   </span>
+                                 )}
+                                 
+                                 <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 print:hidden">
+                                    <button
+                                        onClick={() => handleCheckChange(post.id, worker.id, 'GOOD')}
+                                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${currentStatus === 'GOOD' ? 'bg-green-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
+                                    >
+                                        {currentStatus === 'GOOD' && <span>✓</span>}
+                                        BON
+                                    </button>
+                                    <button
+                                        onClick={() => handleCheckChange(post.id, worker.id, 'FAULTY')}
+                                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${currentStatus === 'FAULTY' ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
+                                    >
+                                        {currentStatus === 'FAULTY' && <span>⚠</span>}
+                                        DÉFECTUEUX
+                                    </button>
+                                 </div>
+                                 
+                                 {check && (
+                                    <span className="text-xs text-gray-500 italic mt-1 font-medium">
+                                        Enregistré à {new Date(check.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                 )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="px-6 py-8 text-center text-gray-500 italic bg-gray-50/30">
+                          Aucun travailleur assigné à ce poste pour ce quart de travail.
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-                
-                <div className="divide-y divide-gray-100">
-                  {assignedWorkers.length > 0 ? (
-                    assignedWorkers.map((worker) => {
+                );
+              })}
+            </div>
+
+            {/* Print-only compact table */}
+            <div className="hidden print:block w-full">
+              <table className="w-full border-collapse text-[10px]">
+                <thead>
+                  <tr>
+                    <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Poste</th>
+                    <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Travailleur</th>
+                    <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Check</th>
+                    <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Bon / Défectueux</th>
+                    <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Heure</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPosts.flatMap((post) => {
+                    const assignedWorkers = (assignmentByPost[post.id] || []).filter(w => {
+                      if (shiftFilter === 'jour') return WORKER_TYPES_JOUR.includes(w.type);
+                      if (shiftFilter === 'soir') return WORKER_TYPES_SOIR.includes(w.type);
+                      return true;
+                    });
+
+                    return assignedWorkers.map((worker) => {
                       const check = machineryChecks.find(
                         (c) => c.postId === post.id && c.planId === currentPlan.id && c.workerId === worker.id
                       );
                       const hasBeenChecked = !!check;
-                      const currentStatus = check?.status || 'UNKNOWN';
+
+                      const checkText = hasBeenChecked ? 'Oui' : 'Non';
+                      const bonDefText = !check
+                        ? '—'
+                        : check.status === 'GOOD'
+                          ? 'BON'
+                          : check.status === 'FAULTY'
+                            ? 'DÉFECTUEUX'
+                            : '—';
+                      const timeText = check
+                        ? new Date(check.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : '';
 
                       return (
-                        <div key={worker.id} className={`px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${hasBeenChecked ? 'bg-gray-50' : 'bg-red-50/30'}`}>
-                          <div className="flex items-center gap-3">
-                            <div className={`h-10 w-10 flex items-center justify-center rounded-full font-bold uppercase ${hasBeenChecked ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
-                              {worker.name.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="font-bold text-gray-900">{worker.name}</p>
-                              <p className="text-xs text-gray-500">Matricule: {worker.anciennete}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col sm:items-end gap-2">
-                             {!hasBeenChecked ? (
-                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                   <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
-                                 </svg>
-                                 CHECKUP REQUIS
-                               </span>
-                             ) : (
-                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                   <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4.006-5.503Z" clipRule="evenodd" />
-                                 </svg>
-                                 CHECKUP EFFECTUÉ
-                               </span>
-                             )}
-                             
-                             <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 print:hidden">
-                                <button
-                                    onClick={() => handleCheckChange(post.id, worker.id, 'GOOD')}
-                                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${currentStatus === 'GOOD' ? 'bg-green-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
-                                >
-                                    {currentStatus === 'GOOD' && <span>✓</span>}
-                                    BON
-                                </button>
-                                <button
-                                    onClick={() => handleCheckChange(post.id, worker.id, 'FAULTY')}
-                                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${currentStatus === 'FAULTY' ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
-                                >
-                                    {currentStatus === 'FAULTY' && <span>⚠</span>}
-                                    DÉFECTUEUX
-                                </button>
-                             </div>
-                             
-                             {check && (
-                                <span className="text-xs text-gray-500 italic mt-1 font-medium">
-                                    Enregistré à {new Date(check.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                             )}
-                          </div>
-                        </div>
+                        <tr key={`${post.id}-${worker.id}`} className="border border-gray-200">
+                          <td className="border border-gray-200 px-2 py-1 align-top">{post.name}</td>
+                          <td className="border border-gray-200 px-2 py-1 align-top">{worker.name}</td>
+                          <td className="border border-gray-200 px-2 py-1 align-top">{checkText}</td>
+                          <td className="border border-gray-200 px-2 py-1 align-top">{bonDefText}</td>
+                          <td className="border border-gray-200 px-2 py-1 align-top">{timeText}</td>
+                        </tr>
                       );
-                    })
-                  ) : (
-                    <div className="px-6 py-8 text-center text-gray-500 italic bg-gray-50/30">
-                      Aucun travailleur assigné à ce poste pour ce quart de travail.
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })
+                    });
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
-          <div className="px-6 py-12 text-center bg-white rounded-xl border border-dashed border-gray-300">
+          <div className="px-6 py-12 text-center bg-white rounded-xl border border-dashed border-gray-300 print:block">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-gray-300 mx-auto mb-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M11.423 20.25a2.25 2.25 0 0 0 4.5 0V17.25H11.423v3.00zm0-3.75h4.5m-4.5 0v-4.5h4.5v4.5m-4.5-4.5V9a2.25 2.25 0 0 1 4.5 0v3.00h-4.5zM3 17.25h3.00v3.00H3v-3.00zm0-3.75h3.00v3.00H3v-3.00zm0-3.75h3.00v3.00H3v-3.00zm0-3.75h3.00v3.00H3v-3.00z" />
             </svg>

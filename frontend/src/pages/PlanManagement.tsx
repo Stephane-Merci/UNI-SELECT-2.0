@@ -1353,6 +1353,32 @@ export default function PlanManagement() {
         </div>
       )}
 
+      {isFullScreen && currentPlan && (
+        <div className="bg-white shadow-sm border-b px-2 py-2 shrink-0">
+          <div className="flex items-center gap-6 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-inner shrink-0">
+            <div className="flex flex-col items-center w-10">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">PIC</span>
+              <span className="text-lg font-black text-blue-600 leading-none">{stats.pic}</span>
+            </div>
+            <div className="h-8 w-px bg-gray-200"></div>
+            <div className="flex flex-col items-center w-10">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">MET</span>
+              <span className="text-lg font-black text-emerald-600 leading-none">{stats.met}</span>
+            </div>
+            <div className="h-8 w-px bg-gray-200"></div>
+            <div className="flex flex-col items-center w-12">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Autres</span>
+              <span className="text-lg font-black text-slate-600 leading-none">{stats.others}</span>
+            </div>
+            <div className="h-8 w-px bg-gray-300"></div>
+            <div className="flex flex-col items-center px-2 w-14">
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Total</span>
+              <span className="text-xl font-black text-indigo-700 leading-none">{stats.total}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {currentPlan ? (
         <DndContext
           sensors={user?.canEdit ? sensors : []}
