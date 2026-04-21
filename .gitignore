@@ -37,6 +37,5 @@ yarn-error.log*
 *.db
 *.sqlite
 
-# Prisma
-backend/prisma/migrations/
+# Prisma — migrations MUST stay in git (CI/Railway run `prisma migrate deploy`).
 backend/src/generated/

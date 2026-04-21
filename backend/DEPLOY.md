@@ -7,7 +7,7 @@ Errors like **"The table public.Plan does not exist"** or **"The table public.Bo
 ## What we changed so it doesn’t happen again
 
 1. **Prisma migrations are in the repo**  
-   The folder `prisma/migrations/` contains the initial migration (`20250101000000_init`) that creates all tables (Worker, Post, Plan, Assignment, Booking, etc.). Keep this folder in source control.
+   The folder `backend/prisma/migrations/` must be **committed** (do **not** add it to `.gitignore`). It contains the migration history; without it, `prisma migrate deploy` in CI or `start:prod` has nothing to apply, and the live DB will miss new enum values and tables.
 
 2. **Migrations run automatically before the app starts in production**  
    - Script **`start:prod`** runs `prisma migrate deploy` then starts the server.  
