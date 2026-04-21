@@ -113,6 +113,15 @@ export interface Post {
   updatedAt: string;
 }
 
+/** Response from GET /posts/:id/delete-impact (Admin — before deleting a post). */
+export interface PostDeleteImpact {
+  post: { id: string; name: string };
+  workersUsingAsOriginal: { id: string; name: string; anciennete: string }[];
+  activeBooking: { id: string; name: string } | null;
+  /** Active booking rows that still point at this post (will follow the same reassignment). */
+  bookingAssignmentsOnThisPost: { workerId: string; workerName: string; anciennete: string }[];
+}
+
 export interface Plan {
   id: string;
   name: string;

@@ -83,7 +83,7 @@ interface AppState {
   createWorker: (worker: Omit<Worker, 'id' | 'createdAt' | 'updatedAt' | 'originalPost'> & { originalPostId: string }) => Promise<void>;
   createPost: (post: Omit<Post, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updatePost: (postId: string, post: Partial<Omit<Post, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<void>;
-  deletePost: (postId: string) => Promise<void>;
+  deletePost: (postId: string, reassignOriginalPost?: Record<string, string>) => Promise<void>;
   assignWorker: (planId: string, workerId: string, postId: string) => Promise<void>;
   updateWorkerPresence: (planId: string, workerId: string, type: WorkerType) => Promise<void>;
   updateWorkerType: (workerId: string, type: WorkerType, absenceEndDate?: string | null) => Promise<void>;
@@ -339,15 +339,21 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  deletePost: async (postId) => {
+  deletePost: async (postId, reassignOriginalPost) => {
     set({ loading: true, error: null });
     try {
-      await apiClient.delete(`/posts/${postId}`);
+      await apiClient.delete(`/posts/${postId}`, {
+        data:
+          reassignOriginalPost && Object.keys(reassignOriginalPost).length > 0
+            ? { reassignOriginalPost }
+            : {},
+      });
       set((state) => ({
         posts: state.posts.filter((p) => p.id !== postId),
         assignments: state.assignments.filter((a) => a.postId !== postId),
         loading: false,
       }));
+      await get().fetchWorkers();
     } catch (error: any) {
       set({ error: error.message, loading: false });
       throw error;

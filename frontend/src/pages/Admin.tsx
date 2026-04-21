@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import apiClient from '../api/client';
-import { Worker, Post, Manager } from '../types';
+import { Worker, Post, Manager, PostDeleteImpact } from '../types';
 import CreateWorkerModal from '../components/CreateWorkerModal';
 import CreatePostModal from '../components/CreatePostModal';
 import { useAuthStore } from '../store/useAuthStore';
@@ -119,7 +119,7 @@ export default function Admin() {
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
-    type: 'worker' | 'post' | 'manager';
+    type: 'worker' | 'manager';
     id: string;
     name: string;
   }>({
@@ -128,6 +128,14 @@ export default function Admin() {
     id: '',
     name: '',
   });
+
+  const [postDeleteDialog, setPostDeleteDialog] = useState<null | {
+    post: Post;
+    step: 'loading' | 'ready';
+    impact: PostDeleteImpact | null;
+    reassign: Record<string, string>;
+    localError: string;
+  }>(null);
 
   useEffect(() => {
     fetchWorkers();
@@ -194,24 +202,56 @@ export default function Admin() {
     }
   };
 
-  const confirmDeletePost = (post: Post) => {
-    setDeleteModal({
-      isOpen: true,
-      type: 'post',
-      id: post.id,
-      name: post.name,
-    });
+  const openPostDeleteDialog = async (post: Post) => {
+    setError('');
+    setPostDeleteDialog({ post, step: 'loading', impact: null, reassign: {}, localError: '' });
+    try {
+      const res = await apiClient.get<PostDeleteImpact>(`/posts/${post.id}/delete-impact`);
+      const impact = res.data;
+      const reassign: Record<string, string> = {};
+      for (const w of impact.workersUsingAsOriginal) {
+        reassign[w.id] = '';
+      }
+      setPostDeleteDialog({ post, step: 'ready', impact, reassign, localError: '' });
+    } catch (e: any) {
+      setPostDeleteDialog(null);
+      setError(e?.response?.data?.error || e?.message || 'Impossible de préparer la suppression du poste');
+    }
   };
 
-  const handleDeletePost = async (postId: string) => {
+  const submitPostDelete = async () => {
+    if (!postDeleteDialog?.impact) return;
+    const { post, impact, reassign } = postDeleteDialog;
+    const otherPosts = posts.filter((p) => p.id !== post.id);
+    if (impact.workersUsingAsOriginal.length > 0 && otherPosts.length === 0) {
+      setPostDeleteDialog((d) =>
+        d ? { ...d, localError: 'Créez au moins un autre poste avant de supprimer celui-ci (réaffectation obligatoire).' } : d
+      );
+      return;
+    }
+    if (impact.workersUsingAsOriginal.length > 0) {
+      for (const w of impact.workersUsingAsOriginal) {
+        if (!reassign[w.id]) {
+          setPostDeleteDialog((d) =>
+            d ? { ...d, localError: 'Choisissez un nouveau poste pour chaque travailleur listé.' } : d
+          );
+          return;
+        }
+      }
+    }
     setLoading(true);
+    setPostDeleteDialog((d) => (d ? { ...d, localError: '' } : d));
     setError('');
     try {
-      await deletePost(postId);
-      return true;
+      if (impact.workersUsingAsOriginal.length > 0) {
+        await deletePost(post.id, reassign);
+      } else {
+        await deletePost(post.id);
+      }
+      setPostDeleteDialog(null);
     } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || 'Erreur lors de la suppression du poste');
-      return false;
+      const msg = e?.response?.data?.error || e?.message || 'Erreur lors de la suppression du poste';
+      setPostDeleteDialog((d) => (d ? { ...d, localError: msg } : d));
     } finally {
       setLoading(false);
     }
@@ -664,7 +704,7 @@ export default function Admin() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => confirmDeletePost(p)}
+                              onClick={() => openPostDeleteDialog(p)}
                               className="px-3 py-1 text-xs font-medium rounded-md bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all border border-red-100"
                             >
                               Supprimer
@@ -999,19 +1039,125 @@ export default function Admin() {
       )}
       {showPostModal && <CreatePostModal onClose={() => setShowPostModal(false)} />}
 
+      {postDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-bold text-gray-900">Supprimer le poste</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                <span className="font-semibold">{postDeleteDialog.post.name}</span>
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              {postDeleteDialog.step === 'loading' && (
+                <p className="text-gray-600 text-sm">Chargement…</p>
+              )}
+              {postDeleteDialog.step === 'ready' && postDeleteDialog.impact && (
+                <>
+                  {postDeleteDialog.localError && (
+                    <div className="p-3 rounded-lg bg-red-50 text-red-800 text-sm">{postDeleteDialog.localError}</div>
+                  )}
+                  {postDeleteDialog.impact.workersUsingAsOriginal.length === 0 ? (
+                    <p className="text-gray-700 text-sm">
+                      Aucun travailleur n&apos;a ce poste comme poste original. Vous pouvez supprimer ce poste définitivement.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-gray-700 text-sm">
+                        Les travailleurs ci-dessous ont ce poste comme <strong>poste original</strong>. Choisissez un{' '}
+                        <strong>nouveau poste</strong> pour chacun avant suppression.
+                      </p>
+                      {postDeleteDialog.impact.activeBooking && (
+                        <div className="rounded-lg border border-indigo-100 bg-indigo-50/80 px-3 py-2 text-sm text-indigo-900">
+                          Le booking actif{' '}
+                          <span className="font-semibold">{postDeleteDialog.impact.activeBooking.name}</span> sera mis à
+                          jour : les affectations sur ce poste pour ces travailleurs utiliseront les nouveaux postes
+                          choisis.
+                        </div>
+                      )}
+                      <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Travailleur</th>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Nouveau poste</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {postDeleteDialog.impact.workersUsingAsOriginal.map((w) => (
+                              <tr key={w.id}>
+                                <td className="px-3 py-2">
+                                  <div className="font-medium text-gray-900">{w.name}</div>
+                                  <div className="text-xs text-gray-500">Matricule {w.anciennete}</div>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <select
+                                    className="w-full max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                                    value={postDeleteDialog.reassign[w.id] ?? ''}
+                                    onChange={(e) =>
+                                      setPostDeleteDialog((d) =>
+                                        d
+                                          ? {
+                                              ...d,
+                                              reassign: { ...d.reassign, [w.id]: e.target.value },
+                                              localError: '',
+                                            }
+                                          : d
+                                      )
+                                    }
+                                  >
+                                    <option value="">— Choisir un poste —</option>
+                                    {posts
+                                      .filter((p) => p.id !== postDeleteDialog.post.id)
+                                      .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
+                                      .map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.name}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setPostDeleteDialog(null)}
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitPostDelete()}
+                disabled={loading || postDeleteDialog.step !== 'ready'}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {loading ? 'Suppression…' : 'Supprimer définitivement'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <DeleteConfirmationModal
         isOpen={deleteModal.isOpen}
         onClose={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
         onConfirm={async () => {
           if (deleteModal.type === 'worker') return handleDeleteWorker(deleteModal.id);
-          else if (deleteModal.type === 'post') return handleDeletePost(deleteModal.id);
           else if (deleteModal.type === 'manager') return handleDeleteManager(deleteModal.id);
           return false;
         }}
-        title={`Supprimer ${
-          deleteModal.type === 'worker' ? 'le travailleur' : 
-          deleteModal.type === 'post' ? 'le poste' : 'le compte'
-        }`}
+        title={`Supprimer ${deleteModal.type === 'worker' ? 'le travailleur' : 'le compte'}`}
         message={`Vous êtes sur le point de supprimer définivement cet élément.`}
         itemName={deleteModal.name}
       />

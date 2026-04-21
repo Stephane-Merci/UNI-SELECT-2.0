@@ -274,11 +274,15 @@ export default function WorkAllocation() {
     const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
     const socket = io(socketUrl);
     socket.on('connect', () => socket.emit('join-room', 'main'));
-    socket.on('worker-original-post-updated', () => fetchWorkers());
+    socket.on('worker-original-post-updated', () => {
+      fetchWorkers();
+      fetchBookings();
+    });
+    socket.on('booking-updated', () => fetchBookings());
     socket.on('post-deleted', () => fetchPosts());
     socket.on('post-updated', () => fetchPosts());
     return () => { socket.disconnect(); };
-  }, [fetchWorkers, fetchPosts]);
+  }, [fetchWorkers, fetchPosts, fetchBookings]);
 
   const currentZone = useCallback(
     (w: Worker): string => {
