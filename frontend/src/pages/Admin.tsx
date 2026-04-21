@@ -9,7 +9,7 @@ import { useAuthStore } from '../store/useAuthStore';
 interface DeleteConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<boolean> | boolean;
   title: string;
   message: string;
   itemName: string;
@@ -44,9 +44,9 @@ function DeleteConfirmationModal({ isOpen, onClose, onConfirm, title, message, i
               Annuler
             </button>
             <button
-              onClick={() => {
-                onConfirm();
-                onClose();
+              onClick={async () => {
+                const ok = await onConfirm();
+                if (ok) onClose();
               }}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors shadow-lg shadow-red-200"
             >
@@ -208,8 +208,10 @@ export default function Admin() {
     setError('');
     try {
       await deletePost(postId);
+      return true;
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'Erreur lors de la suppression du poste');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -260,8 +262,10 @@ export default function Admin() {
     try {
       await apiClient.delete(`/workers/${workerId}`);
       await fetchWorkers();
+      return true;
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'Erreur lors de la suppression du travailleur');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -282,8 +286,10 @@ export default function Admin() {
     try {
       await apiClient.delete(`/auth/${username}`);
       await fetchManagers();
+      return true;
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'Erreur lors de la suppression du compte');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -600,11 +606,6 @@ export default function Admin() {
                     ) : (
                       <div className="flex items-center gap-2">
                         <span>{p.description || <span className="text-gray-400 italic">Sans description</span>}</span>
-                        {p.machineryStatus === 'FAULTY' && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 animate-pulse border border-red-200">
-                            MACHINERIE DÉFECTUEUSE
-                          </span>
-                        )}
                       </div>
                     )}
                   </td>
@@ -1001,10 +1002,11 @@ export default function Admin() {
       <DeleteConfirmationModal
         isOpen={deleteModal.isOpen}
         onClose={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
-        onConfirm={() => {
-          if (deleteModal.type === 'worker') handleDeleteWorker(deleteModal.id);
-          else if (deleteModal.type === 'post') handleDeletePost(deleteModal.id);
-          else if (deleteModal.type === 'manager') handleDeleteManager(deleteModal.id);
+        onConfirm={async () => {
+          if (deleteModal.type === 'worker') return handleDeleteWorker(deleteModal.id);
+          else if (deleteModal.type === 'post') return handleDeletePost(deleteModal.id);
+          else if (deleteModal.type === 'manager') return handleDeleteManager(deleteModal.id);
+          return false;
         }}
         title={`Supprimer ${
           deleteModal.type === 'worker' ? 'le travailleur' : 

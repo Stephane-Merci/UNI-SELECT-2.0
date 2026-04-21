@@ -9,7 +9,10 @@ const machineryCheckSchema = z.object({
   planId: z.string().min(1),
   postId: z.string().min(1),
   workerId: z.string().min(1),
-  status: z.enum(['GOOD', 'FAULTY', 'UNKNOWN']),
+  // Simplified check flow: only done/not done is required.
+  checked: z.boolean().optional(),
+  // Backward compatibility with previous clients.
+  status: z.enum(['GOOD', 'FAULTY', 'UNKNOWN']).optional(),
 });
 
 // Get machinery checks for a plan
@@ -26,7 +29,7 @@ router.get('/plan/:planId', async (req, res) => {
     // Map to frontend format
     const mapped = checks.map(dbCheck => ({
       ...dbCheck,
-      status: dbCheck.isDone ? (dbCheck.isFaulty ? 'FAULTY' : 'GOOD') : 'UNKNOWN',
+      checked: dbCheck.isDone,
       checkedAt: dbCheck.updatedAt
     }));
     
@@ -42,9 +45,11 @@ router.post('/check', async (req, res) => {
     const data = machineryCheckSchema.parse(req.body);
 
     const include = { post: true, worker: true } as const;
+    const checked = data.checked ?? (data.status ? data.status !== 'UNKNOWN' : true);
     const write = {
-      isDone: true,
-      isFaulty: data.status === 'FAULTY',
+      isDone: checked,
+      // Defect state no longer drives UI workflow; keep false for simplified checks.
+      isFaulty: false,
       updatedAt: new Date(),
     };
 
@@ -75,7 +80,7 @@ router.post('/check', async (req, res) => {
     // Map to frontend format
     const check = {
       ...dbCheck,
-      status: dbCheck.isDone ? (dbCheck.isFaulty ? 'FAULTY' : 'GOOD') : 'UNKNOWN',
+      checked: dbCheck.isDone,
       checkedAt: dbCheck.updatedAt
     };
 

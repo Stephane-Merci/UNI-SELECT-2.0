@@ -70,13 +70,13 @@ export default function MachineryCheckup() {
     });
   }, [postsRequiringMachinery, assignmentByPost, shiftFilter]);
 
-  const handleCheckChange = async (postId: string, workerId: string, status: 'GOOD' | 'FAULTY' | 'UNKNOWN') => {
+  const handleCheckChange = async (postId: string, workerId: string, checked: boolean) => {
     if (!currentPlan) return;
     await updateMachineryCheck({
       planId: currentPlan.id,
       postId,
       workerId,
-      status,
+      checked,
     });
   };
 
@@ -156,8 +156,7 @@ export default function MachineryCheckup() {
                           const check = machineryChecks.find(
                             (c) => c.postId === post.id && c.planId === currentPlan.id && c.workerId === worker.id
                           );
-                          const hasBeenChecked = !!check;
-                          const currentStatus = check?.status || 'UNKNOWN';
+                          const hasBeenChecked = !!check && check.checked;
 
                           // Zebra striping between workers (light grey).
                           const zebra = workerIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60';
@@ -176,38 +175,18 @@ export default function MachineryCheckup() {
                               </div>
         
                               <div className="flex flex-col sm:items-end gap-2">
-                                 {!hasBeenChecked ? (
-                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                       <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
-                                     </svg>
-                                     CHECKUP REQUIS
-                                   </span>
-                                 ) : (
-                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                       <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4.006-5.503Z" clipRule="evenodd" />
-                                     </svg>
-                                     CHECKUP EFFECTUÉ
-                                   </span>
-                                 )}
+                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${hasBeenChecked ? 'bg-green-100 text-green-800 border-green-200' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
+                                   {hasBeenChecked ? 'CHECK EFFECTUÉ' : 'CHECK REQUIS'}
+                                 </span>
                                  
-                                 <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 print:hidden">
-                                    <button
-                                        onClick={() => handleCheckChange(post.id, worker.id, 'GOOD')}
-                                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${currentStatus === 'GOOD' ? 'bg-green-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
-                                    >
-                                        {currentStatus === 'GOOD' && <span>✓</span>}
-                                        BON
-                                    </button>
-                                    <button
-                                        onClick={() => handleCheckChange(post.id, worker.id, 'FAULTY')}
-                                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${currentStatus === 'FAULTY' ? 'bg-red-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
-                                    >
-                                        {currentStatus === 'FAULTY' && <span>⚠</span>}
-                                        DÉFECTUEUX
-                                    </button>
-                                 </div>
+                                 <button
+                                   type="button"
+                                   onClick={() => handleCheckChange(post.id, worker.id, !hasBeenChecked)}
+                                   className={`print:hidden inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-md border transition-all ${hasBeenChecked ? 'bg-green-600 text-white border-green-700 hover:bg-green-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                                 >
+                                   <span className={`h-2.5 w-2.5 rounded-full ${hasBeenChecked ? 'bg-white' : 'bg-gray-300'}`}></span>
+                                   Check fait: {hasBeenChecked ? 'Oui' : 'Non'}
+                                 </button>
                                  
                                  {check && (
                                     <span className="text-xs text-gray-500 italic mt-1 font-medium">
@@ -236,8 +215,7 @@ export default function MachineryCheckup() {
                   <tr>
                     <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Poste</th>
                     <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Travailleur</th>
-                    <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Check</th>
-                    <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Bon / Défectueux</th>
+                    <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Check fait</th>
                     <th className="text-left border border-gray-300 px-2 py-1 bg-gray-100">Heure</th>
                   </tr>
                 </thead>
@@ -253,16 +231,8 @@ export default function MachineryCheckup() {
                       const check = machineryChecks.find(
                         (c) => c.postId === post.id && c.planId === currentPlan.id && c.workerId === worker.id
                       );
-                      const hasBeenChecked = !!check;
-
+                      const hasBeenChecked = !!check && check.checked;
                       const checkText = hasBeenChecked ? 'Oui' : 'Non';
-                      const bonDefText = !check
-                        ? '—'
-                        : check.status === 'GOOD'
-                          ? 'BON'
-                          : check.status === 'FAULTY'
-                            ? 'DÉFECTUEUX'
-                            : '—';
                       const timeText = check
                         ? new Date(check.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         : '';
@@ -272,7 +242,6 @@ export default function MachineryCheckup() {
                           <td className="border border-gray-200 px-2 py-1 align-top">{post.name}</td>
                           <td className="border border-gray-200 px-2 py-1 align-top">{worker.name}</td>
                           <td className="border border-gray-200 px-2 py-1 align-top">{checkText}</td>
-                          <td className="border border-gray-200 px-2 py-1 align-top">{bonDefText}</td>
                           <td className="border border-gray-200 px-2 py-1 align-top">{timeText}</td>
                         </tr>
                       );

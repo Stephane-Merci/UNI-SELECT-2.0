@@ -93,7 +93,12 @@ interface AppState {
   deleteUnfilledPosition: (unfilledPositionId: string) => Promise<void>;
   resetPlan: (planId: string) => Promise<void>;
   fetchMachineryChecks: (planId: string) => Promise<void>;
-  updateMachineryCheck: (data: Omit<MachineryCheck, 'id' | 'checkedAt'>) => Promise<void>;
+  updateMachineryCheck: (data: {
+    planId: string;
+    postId: string;
+    workerId: string;
+    checked: boolean;
+  }) => Promise<void>;
   updatePostMachineryStatus: (postId: string, status: 'GOOD' | 'FAULTY' | 'UNKNOWN') => Promise<void>;
 }
 

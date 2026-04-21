@@ -210,6 +210,6 @@ export interface MachineryCheck {
   planId: string;
   postId: string;
   workerId: string;
-  status: 'GOOD' | 'FAULTY' | 'UNKNOWN';
+  checked: boolean;
   checkedAt: string;
 }

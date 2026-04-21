@@ -283,6 +283,7 @@ function PostsPanel({
   onShiftFilterChange,
   isFullScreen,
   onToggleFullScreen,
+  stats,
 }: {
   posts: Post[];
   workers: Worker[];
@@ -298,6 +299,7 @@ function PostsPanel({
   onShiftFilterChange: (s: 'jour' | 'soir' | 'tous') => void;
   isFullScreen: boolean;
   onToggleFullScreen: () => void;
+  stats: { pic: number; met: number; others: number; total: number };
 }) {
   const getWorkersForPost = (postId: string) => {
     return workers
@@ -325,25 +327,50 @@ function PostsPanel({
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h2 className="text-xl font-bold text-gray-800">Postes</h2>
-        <div className="flex bg-gray-100 p-1 rounded-lg">
-          <button
-            onClick={() => onShiftFilterChange('jour')}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${shiftFilter === 'jour' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Jour
-          </button>
-          <button
-            onClick={() => onShiftFilterChange('soir')}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${shiftFilter === 'soir' ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Soir
-          </button>
-          <button
-            onClick={() => onShiftFilterChange('tous')}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${shiftFilter === 'tous' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Tous
-          </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => onShiftFilterChange('jour')}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${shiftFilter === 'jour' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Jour
+            </button>
+            <button
+              onClick={() => onShiftFilterChange('soir')}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${shiftFilter === 'soir' ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Soir
+            </button>
+            <button
+              onClick={() => onShiftFilterChange('tous')}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${shiftFilter === 'tous' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Tous
+            </button>
+          </div>
+          {isFullScreen && (
+            <div className="flex items-center gap-3 px-3 py-1.5 bg-gray-50 rounded-xl border border-gray-100 shadow-inner shrink-0">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">PIC</span>
+                <span className="text-sm font-black text-blue-600 leading-none">{stats.pic}</span>
+              </div>
+              <div className="h-4 w-px bg-gray-200"></div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">MET</span>
+                <span className="text-sm font-black text-emerald-600 leading-none">{stats.met}</span>
+              </div>
+              <div className="h-4 w-px bg-gray-200"></div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Autres</span>
+                <span className="text-sm font-black text-slate-600 leading-none">{stats.others}</span>
+              </div>
+              <div className="h-4 w-px bg-gray-300"></div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Total</span>
+                <span className="text-base font-black text-indigo-700 leading-none">{stats.total}</span>
+              </div>
+            </div>
+          )}
         </div>
         <button
           type="button"
@@ -1353,32 +1380,6 @@ export default function PlanManagement() {
         </div>
       )}
 
-      {isFullScreen && currentPlan && (
-        <div className="bg-white shadow-sm border-b px-2 py-2 shrink-0">
-          <div className="flex items-center gap-6 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-inner shrink-0">
-            <div className="flex flex-col items-center w-10">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">PIC</span>
-              <span className="text-lg font-black text-blue-600 leading-none">{stats.pic}</span>
-            </div>
-            <div className="h-8 w-px bg-gray-200"></div>
-            <div className="flex flex-col items-center w-10">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">MET</span>
-              <span className="text-lg font-black text-emerald-600 leading-none">{stats.met}</span>
-            </div>
-            <div className="h-8 w-px bg-gray-200"></div>
-            <div className="flex flex-col items-center w-12">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Autres</span>
-              <span className="text-lg font-black text-slate-600 leading-none">{stats.others}</span>
-            </div>
-            <div className="h-8 w-px bg-gray-300"></div>
-            <div className="flex flex-col items-center px-2 w-14">
-              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Total</span>
-              <span className="text-xl font-black text-indigo-700 leading-none">{stats.total}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {currentPlan ? (
         <DndContext
           sensors={user?.canEdit ? sensors : []}
@@ -1406,6 +1407,7 @@ export default function PlanManagement() {
                 onShiftFilterChange={setShiftFilter}
                 isFullScreen={isFullScreen}
                 onToggleFullScreen={() => setFullScreen(!isFullScreen)}
+                stats={stats}
               />
             </div>
 
