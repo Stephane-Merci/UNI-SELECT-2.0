@@ -16,6 +16,8 @@ export enum WorkerType {
   PRERETRAITE = 'PRERETRAITE',
   CONGE_PARENTAL = 'CONGE_PARENTAL',
   TRAVAIL_LEGER = 'TRAVAIL_LEGER',
+  /** Same behaviour as travail léger: presence with end date, assignable to posts. */
+  FORMATION = 'FORMATION',
 }
 
 /** The 6 origin types: used for Worker.type and in create-worker dropdown. Drag within these updates Worker.type. */
@@ -35,6 +37,7 @@ export const WORKER_TYPES_JOUR: WorkerType[] = [
   WorkerType.MOBILITE_DU_JOUR,
   WorkerType.JOUR,
   WorkerType.TRAVAIL_LEGER,
+  WorkerType.FORMATION,
 ];
 
 /** Worker types considered "soir" (evening shift) — for filtering replacement du soir dropdowns. */
@@ -44,6 +47,7 @@ export const WORKER_TYPES_SOIR: WorkerType[] = [
   WorkerType.MOBILITE_DU_SOIR,
   WorkerType.SOIR,
   WorkerType.TRAVAIL_LEGER,
+  WorkerType.FORMATION,
 ];
 
 export const WorkerTypeLabels: Record<WorkerType, string> = {
@@ -62,6 +66,7 @@ export const WorkerTypeLabels: Record<WorkerType, string> = {
   [WorkerType.PRERETRAITE]: 'Préretraite',
   [WorkerType.CONGE_PARENTAL]: 'Congé parental',
   [WorkerType.TRAVAIL_LEGER]: 'Travail léger',
+  [WorkerType.FORMATION]: 'Formation',
 };
 
 // Colors per table: Postes fixes jour=Vert, Mobiles jour=Violet, Occasionnels jours=Bleu,
@@ -82,6 +87,7 @@ export const WorkerTypeColors: Record<WorkerType, string> = {
   [WorkerType.PRERETRAITE]: '#EC4899',
   [WorkerType.CONGE_PARENTAL]: '#14B8A6',
   [WorkerType.TRAVAIL_LEGER]: '#06B6D4',      // Cyan
+  [WorkerType.FORMATION]: '#9333EA',          // Violet (distinct from travail léger)
 };
 
 export interface Worker {

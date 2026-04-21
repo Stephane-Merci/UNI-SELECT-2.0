@@ -48,7 +48,8 @@ export default function WorkerCard({
     WorkerType.LIBERATION_EXTERNE,
     WorkerType.INVALIDITE,
     WorkerType.CONGE_PARENTAL,
-    WorkerType.TRAVAIL_LEGER
+    WorkerType.TRAVAIL_LEGER,
+    WorkerType.FORMATION,
   ].includes(displayType);
 
   const isPermanent = [

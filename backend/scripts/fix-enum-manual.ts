@@ -3,7 +3,7 @@ import { PrismaClient } from './src/generated/prisma';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Adding TRAVAIL_LEGER to WorkerType enum...');
+  console.log('Ensuring WorkerType enum values TRAVAIL_LEGER, FORMATION...');
   try {
     // We use $executeRawUnsafe because ADD VALUE cannot be used in a transaction
     // and Prisma wraps everything in a transaction by default if not careful.
@@ -12,10 +12,11 @@ async function main() {
     
     // So we'll try to execute it.
     await prisma.$executeRawUnsafe(`ALTER TYPE "WorkerType" ADD VALUE IF NOT EXISTS 'TRAVAIL_LEGER'`);
-    console.log('Successfully added TRAVAIL_LEGER to WorkerType enum (or it already existed).');
+    await prisma.$executeRawUnsafe(`ALTER TYPE "WorkerType" ADD VALUE IF NOT EXISTS 'FORMATION'`);
+    console.log('Successfully added TRAVAIL_LEGER / FORMATION to WorkerType enum (or they already existed).');
   } catch (error: any) {
     if (error.message.includes('already exists')) {
-      console.log('TRAVAIL_LEGER already exists in WorkerType enum.');
+      console.log('TRAVAIL_LEGER / FORMATION already exists in WorkerType enum.');
     } else {
       console.error('Failed to add WorkerType value:', error);
     }

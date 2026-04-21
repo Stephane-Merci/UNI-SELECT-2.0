@@ -17,7 +17,8 @@ export default function AbsenceConsultation() {
     WorkerType.LIBERATION_EXTERNE,
     WorkerType.INVALIDITE,
     WorkerType.CONGE_PARENTAL,
-    WorkerType.TRAVAIL_LEGER
+    WorkerType.TRAVAIL_LEGER,
+    WorkerType.FORMATION,
   ];
 
   useEffect(() => {

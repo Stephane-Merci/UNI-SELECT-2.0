@@ -33,7 +33,8 @@ export default function WorkerTypeManagement() {
     WorkerType.LIBERATION_EXTERNE,
     WorkerType.INVALIDITE,
     WorkerType.CONGE_PARENTAL,
-    WorkerType.TRAVAIL_LEGER
+    WorkerType.TRAVAIL_LEGER,
+    WorkerType.FORMATION,
   ];
 
   const sensors = useSensors(
