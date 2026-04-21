@@ -65,7 +65,7 @@ jobs:
       
       - name: Run migrations
         working-directory: ./backend
-        run: npx prisma migrate deploy
+        run: npm run migrate:deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       

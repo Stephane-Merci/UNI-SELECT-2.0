@@ -10,7 +10,8 @@ Errors like **"The table public.Plan does not exist"** or **"The table public.Bo
    The folder `backend/prisma/migrations/` must be **committed** (do **not** add it to `.gitignore`). It contains the migration history; without it, `prisma migrate deploy` in CI or `start:prod` has nothing to apply, and the live DB will miss new enum values and tables.
 
 2. **Migrations run automatically before the app starts in production**  
-   - Script **`start:prod`** runs `prisma migrate deploy` then starts the server.  
+   - Script **`start:prod`** runs **`npm run migrate:deploy`** (which runs `prisma migrate deploy`, and if Prisma reports **P3009** for a failed migration, resolves that migration as rolled back **once** and retries deploy) then starts the server.  
+   - **Render**: set the **build** command to end with `npm run migrate:deploy` (from `backend/`), not only `npx prisma migrate deploy`, so a one-time failed migration can clear itself after the fix is in git.  
    - **Railway** is configured to use `npm run start:prod` as the start command (see `railway.json`).  
    - On other platforms, set the **start command** to:
      ```bash
@@ -44,6 +45,6 @@ Then redeploy using `start:prod` as above.
 | Environment | Start command | Effect |
 |-------------|---------------|--------|
 | Local dev  | `npm run dev` | No migrations (you run `prisma migrate dev` when needed). |
-| Production  | `npm run start:prod` | Runs `prisma migrate deploy` then starts the app so the DB is always up to date. |
+| Production  | `npm run start:prod` | Runs `migrate:deploy` (see above) then starts the app so the DB is always up to date. |
 
 Using `start:prod` in production and (if needed) running `prisma migrate resolve --applied 20250101000000_init` once for an existing DB ensures the previous database errors do not occur again.
