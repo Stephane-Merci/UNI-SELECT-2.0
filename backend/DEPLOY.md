@@ -11,7 +11,8 @@ Errors like **"The table public.Plan does not exist"** or **"The table public.Bo
 
 2. **Migrations run automatically before the app starts in production**  
    - Script **`start:prod`** runs **`npm run migrate:deploy`** (which runs `prisma migrate deploy`, and if Prisma reports **P3009** for a failed migration, resolves that migration as rolled back **once** and retries deploy) then starts the server.  
-   - **Render**: set the **build** command to end with `npm run migrate:deploy` (from `backend/`), not only `npx prisma migrate deploy`, so a one-time failed migration can clear itself after the fix is in git.  
+   - **Render** (build command still ends with `npx prisma migrate deploy`): **`postbuild`** runs after **`npm run build`** when **`RENDER=true`**, and executes the same **`migrate:deploy`** helper. That clears **P3009** *before* the separate `npx prisma migrate deploy` step, so the build can succeed without changing the dashboard. Optionally set **`MIGRATE_ON_BUILD=1`** on other hosts to get the same behaviour.  
+   - **Render** (recommended): set the **build** command to use **`npm run migrate:deploy`** instead of raw `npx prisma migrate deploy` so migrations and P3009 handling stay in one place.  
    - **Railway** is configured to use `npm run start:prod` as the start command (see `railway.json`).  
    - On other platforms, set the **start command** to:
      ```bash
