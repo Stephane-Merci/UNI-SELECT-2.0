@@ -103,6 +103,8 @@ export interface Worker {
   absenceEndDate?: string | null;
   /** First day of absence. */
   absenceStartDate?: string | null;
+  /** Original type before absence. */
+  originType?: WorkerType | null;
   assignments?: Assignment[];
   createdAt: string;
   updatedAt: string;

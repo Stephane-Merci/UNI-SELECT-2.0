@@ -8,8 +8,8 @@ import { io } from 'socket.io-client';
 export default function AbsenceConsultation() {
   const { workers, fetchWorkers, updateWorkerType } = useStore();
   const { user } = useAuthStore();
-  const [pendingUpdate, setPendingUpdate] = useState<{ workerId: string; targetType: WorkerType } | null>(null);
   const [absenceEndDate, setAbsenceEndDate] = useState<string>('');
+  const [absenceStartDate, setAbsenceStartDate] = useState<string>('');
 
   const ABSENCE_TYPES = [
     WorkerType.ABSENT,
@@ -41,9 +41,10 @@ export default function AbsenceConsultation() {
 
   const handleConfirmAbsence = async () => {
     if (pendingUpdate && absenceEndDate) {
-      await updateWorkerType(pendingUpdate.workerId, pendingUpdate.targetType, absenceEndDate);
+      await updateWorkerType(pendingUpdate.workerId, pendingUpdate.targetType, absenceEndDate, absenceStartDate);
       setPendingUpdate(null);
       setAbsenceEndDate('');
+      setAbsenceStartDate('');
       fetchWorkers();
     }
   };
@@ -118,13 +119,14 @@ export default function AbsenceConsultation() {
                         onClick={() => {
                           setPendingUpdate({ workerId: worker.id, targetType: worker.type });
                           setAbsenceEndDate(worker.absenceEndDate ? new Date(worker.absenceEndDate).toISOString().split('T')[0] : '');
+                          setAbsenceStartDate(worker.absenceStartDate ? new Date(worker.absenceStartDate).toISOString().split('T')[0] : '');
                         }}
                         className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-lg transition-all font-semibold flex items-center gap-1"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
-                        Modifier retour
+                        Modifier dates
                       </button>
                     )}
                   </td>
@@ -145,27 +147,44 @@ export default function AbsenceConsultation() {
       {pendingUpdate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-sm w-full mx-4 border border-gray-100 scale-in-center">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Choisir une date de fin</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Modifier la période</h3>
             <p className="text-sm text-gray-600 mb-6">
-              Indiquez quand l'absence de <span className="font-bold text-gray-800">{workers.find(w => w.id === pendingUpdate.workerId)?.name}</span> se termine.
+              Ajustez les dates pour <span className="font-bold text-gray-800">{workers.find(w => w.id === pendingUpdate.workerId)?.name}</span>.
             </p>
-            <input
-              type="date"
-              value={absenceEndDate}
-              onChange={(e) => setAbsenceEndDate(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-6 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-gray-700 font-medium"
-              min={new Date().toISOString().split('T')[0]}
-            />
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date de départ (comprise)</label>
+                <input
+                  type="date"
+                  value={absenceStartDate}
+                  onChange={(e) => setAbsenceStartDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-gray-700 font-medium"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date de retour (comprise)</label>
+                <input
+                  type="date"
+                  value={absenceEndDate}
+                  onChange={(e) => setAbsenceEndDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-gray-700 font-medium"
+                  min={absenceStartDate}
+                />
+              </div>
+            </div>
+
             <div className="flex gap-3">
               <button
-                onClick={() => { setPendingUpdate(null); setAbsenceEndDate(''); }}
+                onClick={() => { setPendingUpdate(null); setAbsenceEndDate(''); setAbsenceStartDate(''); }}
                 className="flex-1 px-4 py-3 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
               >
                 Annuler
               </button>
               <button
                 onClick={handleConfirmAbsence}
-                disabled={!absenceEndDate}
+                disabled={!absenceEndDate || !absenceStartDate}
                 className="flex-1 px-4 py-3 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5 active:translate-y-0"
               >
                 Confirmer

@@ -17,6 +17,10 @@ export default function MachineryCheckup() {
 
   const [shiftFilter, setShiftFilter] = useState<'jour' | 'soir' | 'tous'>('tous');
 
+  const [selectedWorkerId, setSelectedWorkerId] = useState('');
+  const [selectedPostId, setSelectedPostId] = useState('');
+  const [isAddingManual, setIsAddingManual] = useState(false);
+
   useEffect(() => {
     if (currentPlan) {
       fetchMachineryChecks(currentPlan.id);
@@ -45,8 +49,16 @@ export default function MachineryCheckup() {
     return posts.filter((p) => p.needsMachinery);
   }, [posts]);
 
+  // All posts that either normally need machinery OR have an existing check in the current plan
+  const relevantPosts = useMemo(() => {
+    const postIdsWithChecks = new Set(machineryChecks.map(c => c.postId));
+    return posts.filter(p => p.needsMachinery || postIdsWithChecks.has(p.id));
+  }, [posts, machineryChecks]);
+
   const assignmentByPost = useMemo(() => {
     const map: Record<string, Worker[]> = {};
+    
+    // Start with workers actually assigned in the plan
     assignments
       .filter((a) => a.planId === currentPlan?.id)
       .forEach((a) => {
@@ -54,11 +66,21 @@ export default function MachineryCheckup() {
         const worker = workers.find((w) => w.id === a.workerId);
         if (worker) map[a.postId].push(worker);
       });
+      
+    // Also add workers who have a machinery check even if not assigned to that post
+    machineryChecks.forEach(check => {
+      if (!map[check.postId]) map[check.postId] = [];
+      const worker = workers.find(w => w.id === check.workerId);
+      if (worker && !map[check.postId].some(w => w.id === worker.id)) {
+        map[check.postId].push(worker);
+      }
+    });
+    
     return map;
-  }, [assignments, currentPlan, workers]);
+  }, [assignments, currentPlan, workers, machineryChecks]);
 
   const filteredPosts = useMemo(() => {
-    return postsRequiringMachinery.filter((post) => {
+    return relevantPosts.filter((post) => {
       const assignedWorkers = assignmentByPost[post.id] || [];
       if (shiftFilter === 'tous') return true;
       
@@ -68,7 +90,7 @@ export default function MachineryCheckup() {
         return false;
       });
     });
-  }, [postsRequiringMachinery, assignmentByPost, shiftFilter]);
+  }, [relevantPosts, assignmentByPost, shiftFilter]);
 
   const handleCheckChange = async (postId: string, workerId: string, checked: boolean) => {
     if (!currentPlan) return;
@@ -78,6 +100,24 @@ export default function MachineryCheckup() {
       workerId,
       checked,
     });
+  };
+
+  const handleAddManualCheck = async () => {
+    if (!currentPlan || !selectedPostId || !selectedWorkerId) return;
+    
+    setIsAddingManual(true);
+    try {
+      await updateMachineryCheck({
+        planId: currentPlan.id,
+        postId: selectedPostId,
+        workerId: selectedWorkerId,
+        checked: false,
+      });
+      setSelectedPostId('');
+      setSelectedWorkerId('');
+    } finally {
+      setIsAddingManual(false);
+    }
   };
 
   if (!currentPlan) {
@@ -136,9 +176,9 @@ export default function MachineryCheckup() {
             <div className="print:hidden grid gap-6">
               {filteredPosts.map((post) => {
                 const assignedWorkers = (assignmentByPost[post.id] || []).filter(w => {
-                if (shiftFilter === 'jour') return WORKER_TYPES_JOUR.includes(w.type);
-                if (shiftFilter === 'soir') return WORKER_TYPES_SOIR.includes(w.type);
-                return true;
+                  if (shiftFilter === 'jour') return WORKER_TYPES_JOUR.includes(w.type);
+                  if (shiftFilter === 'soir') return WORKER_TYPES_SOIR.includes(w.type);
+                  return true;
                 });
 
                 return (
@@ -148,6 +188,9 @@ export default function MachineryCheckup() {
                         <h2 className="text-xl font-bold text-gray-800">{post.name}</h2>
                         <p className="text-sm text-gray-500 italic">{post.description || 'Sans description'}</p>
                       </div>
+                      {!post.needsMachinery && (
+                        <span className="px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-bold rounded uppercase">Ajout Manuel</span>
+                      )}
                     </div>
                     
                     <div className="divide-y divide-gray-100">
@@ -208,6 +251,52 @@ export default function MachineryCheckup() {
               })}
             </div>
 
+            {/* Manual Addition Section */}
+            <div className="print:hidden bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-xl p-6 mt-8">
+              <h3 className="text-lg font-bold text-indigo-900 mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Ajouter une inspection manuelle
+              </h3>
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-bold text-indigo-700 uppercase mb-1">Poste</label>
+                  <select 
+                    value={selectedPostId} 
+                    onChange={(e) => setSelectedPostId(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                  >
+                    <option value="">Sélectionner un poste...</option>
+                    {posts.sort((a, b) => a.name.localeCompare(b.name)).map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-bold text-indigo-700 uppercase mb-1">Travailleur</label>
+                  <select 
+                    value={selectedWorkerId} 
+                    onChange={(e) => setSelectedWorkerId(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                  >
+                    <option value="">Sélectionner un travailleur...</option>
+                    {workers.sort((a, b) => a.name.localeCompare(b.name)).map(w => (
+                      <option key={w.id} value={w.id}>({w.anciennete}) {w.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddManualCheck}
+                  disabled={!selectedPostId || !selectedWorkerId || isAddingManual}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-md shadow-indigo-100"
+                >
+                  {isAddingManual ? 'Ajout...' : 'Ajouter'}
+                </button>
+              </div>
+            </div>
+
             {/* Print-only compact table */}
             <div className="hidden print:block w-full">
               <table className="w-full border-collapse text-[10px]">
@@ -263,3 +352,4 @@ export default function MachineryCheckup() {
     </div>
   );
 }
+

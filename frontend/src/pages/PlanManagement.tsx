@@ -522,6 +522,7 @@ export default function PlanManagement() {
   } | null>(null);
   const [preRetraiteInfo, setPreRetraiteInfo] = useState<string[] | null>(null);
   const [preRetraiteAppliedPlanId, setPreRetraiteAppliedPlanId] = useState<string | null>(null);
+  const [absencesAppliedPlanId, setAbsencesAppliedPlanId] = useState<string | null>(null);
 
   const [returningWorkerPrompt, setReturningWorkerPrompt] = useState<{
     worker: Worker;
@@ -621,6 +622,58 @@ export default function PlanManagement() {
   }, [currentPlan, workers, updateWorkerPresence, removeAssignment, assignments, preRetraiteAppliedPlanId]);
 
   useEffect(() => {
+    const applyScheduledAbsencesForPlan = async () => {
+      if (!currentPlan?.id || !currentPlan.date) return;
+      if (absencesAppliedPlanId === currentPlan.id) return;
+
+      setAbsencesAppliedPlanId(currentPlan.id);
+
+      const planDate = normalizeToUTC(currentPlan.date);
+      if (!planDate) return;
+
+      const ABSENCE_TYPES = [
+        WorkerType.ABSENT,
+        WorkerType.VACANCES,
+        WorkerType.LIBERATION_EXTERNE,
+        WorkerType.INVALIDITE,
+        WorkerType.CONGE_PARENTAL,
+        WorkerType.TRAVAIL_LEGER,
+        WorkerType.FORMATION,
+      ];
+
+      const affected = workers.filter((w) => {
+        // Only consider workers who have an absence type as their current global type
+        if (!ABSENCE_TYPES.includes(w.type)) return false;
+        if (!w.absenceStartDate || !w.absenceEndDate) return false;
+        
+        const start = normalizeToUTC(w.absenceStartDate);
+        const end = normalizeToUTC(w.absenceEndDate);
+        
+        // If the plan date is within the absence range
+        return start && end && planDate >= start && planDate <= end;
+      });
+
+      if (affected.length === 0) return;
+
+      for (const w of affected) {
+        // If not already marked as this type in the plan, update it
+        const currentPresence = currentPlan.workerPresences?.find(p => p.workerId === w.id);
+        if (currentPresence?.type !== w.type) {
+          await updateWorkerPresence(currentPlan.id, w.id, w.type);
+          const existingAssignment = assignments.find(
+            (a) => a.workerId === w.id && a.planId === currentPlan.id
+          );
+          if (existingAssignment) {
+            await removeAssignment(existingAssignment.id);
+          }
+        }
+      }
+    };
+
+    void applyScheduledAbsencesForPlan();
+  }, [currentPlan, workers, updateWorkerPresence, removeAssignment, assignments, absencesAppliedPlanId]);
+
+  useEffect(() => {
     const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
     const socket = io(socketUrl);
     socket.on('connect', () => {
@@ -674,6 +727,34 @@ export default function PlanManagement() {
   }, [currentPlan, fetchAssignments, fetchPlans, loadPlan]);
 
   const presenceMap: Record<string, WorkerType> = {};
+  const planDate = currentPlan?.date ? normalizeToUTC(currentPlan.date) : null;
+  const ABSENCE_TYPES = [
+    WorkerType.ABSENT,
+    WorkerType.VACANCES,
+    WorkerType.LIBERATION_EXTERNE,
+    WorkerType.INVALIDITE,
+    WorkerType.CONGE_PARENTAL,
+    WorkerType.TRAVAIL_LEGER,
+    WorkerType.FORMATION,
+  ];
+
+  workers.forEach((worker) => {
+    let type = worker.type;
+    // If worker is globally marked as absent, check if it applies to the current plan date
+    if (ABSENCE_TYPES.includes(worker.type) && planDate) {
+      const start = worker.absenceStartDate ? normalizeToUTC(worker.absenceStartDate) : null;
+      const end = worker.absenceEndDate ? normalizeToUTC(worker.absenceEndDate) : null;
+      const inRange = start && end && planDate >= start && planDate <= end;
+      
+      // If NOT in range, use originType (if available) to show them as active
+      if (!inRange && worker.originType) {
+        type = worker.originType;
+      }
+    }
+    presenceMap[worker.id] = type;
+  });
+
+  // Override with plan-specific presences (including those automatically applied)
   workerPresences.forEach((presence) => {
     presenceMap[presence.workerId] = presence.type;
   });

@@ -13,6 +13,7 @@ model Worker {
   anciennete           String                  @unique(map: "Worker_matricule_key")
   name                 String
   type                 WorkerType              @default(PERMANENT_JOUR)
+  originType           WorkerType?
   originalPostId       String
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
@@ -37,6 +38,7 @@ model Worker {
   presences            WorkerPresence[]
 
   @@index([type])
+  @@index([originType])
   @@index([anciennete], map: "Worker_matricule_idx")
 }
 

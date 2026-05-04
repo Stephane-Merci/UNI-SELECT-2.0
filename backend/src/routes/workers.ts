@@ -21,8 +21,10 @@ const workerSchema = z.object({
   anciennete: z.string().min(1),
   name: z.string().min(1),
   type: z.nativeEnum(WorkerType),
+  originType: z.nativeEnum(WorkerType).nullable().optional(),
   originalPostId: z.string().min(1),
   preRetraiteDay: z.enum(PRE_RETRAITE_DAYS).nullable().optional(),
+  absenceStartDate: z.string().nullable().optional(),
   absenceEndDate: z.string().nullable().optional(),
 });
 
@@ -179,10 +181,10 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Update worker (origin) type and optionally absenceEndDate
+// Update worker (origin) type and optionally absence dates
 router.patch('/:id/type', async (req, res) => {
   try {
-    const { type, absenceEndDate } = req.body;
+    const { type, absenceStartDate, absenceEndDate } = req.body;
     if (!Object.values(WorkerType).includes(type)) {
       return res.status(400).json({ error: 'Invalid worker type' });
     }
@@ -209,12 +211,21 @@ router.patch('/:id/type', async (req, res) => {
 
     const data: any = { type };
 
-    // New absence entry: set start date
+    // If starting a new absence, remember the previous type as originType
     if (isNowAbsent && !wasAbsent) {
-      data.absenceStartDate = new Date();
+      data.originType = worker.type;
+      data.absenceStartDate = absenceStartDate ? new Date(absenceStartDate) : new Date();
     } 
-    // Returning to work: clear absence dates
+    // If already absent and just updating type/dates, keep originType but update dates if provided
+    else if (isNowAbsent && wasAbsent) {
+      if (absenceStartDate !== undefined) {
+        data.absenceStartDate = absenceStartDate ? new Date(absenceStartDate) : null;
+      }
+    }
+    // Returning to work: reset to originType and clear absence dates
     else if (!isNowAbsent) {
+      data.type = worker.originType || type;
+      data.originType = null;
       data.absenceStartDate = null;
       data.absenceEndDate = null;
     }

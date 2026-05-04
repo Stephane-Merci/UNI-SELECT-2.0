@@ -24,6 +24,7 @@ export default function WorkerTypeManagement() {
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);
   const [pendingUpdate, setPendingUpdate] = useState<{ workerId: string; targetType: WorkerType } | null>(null);
   const [absenceEndDate, setAbsenceEndDate] = useState<string>('');
+  const [absenceStartDate, setAbsenceStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   const { user } = useAuthStore();
 
@@ -85,8 +86,9 @@ export default function WorkerTypeManagement() {
       if (worker.type !== targetType) {
         if (ABSENCE_TYPES.includes(targetType as WorkerType)) {
           setPendingUpdate({ workerId, targetType: targetType as WorkerType });
+          setAbsenceStartDate(new Date().toISOString().split('T')[0]);
         } else {
-          await updateWorkerType(workerId, targetType as WorkerType, null);
+          await updateWorkerType(workerId, targetType as WorkerType, null, null);
         }
       }
       return;
@@ -98,8 +100,9 @@ export default function WorkerTypeManagement() {
       if (worker.type !== targetWorker.type) {
         if (ABSENCE_TYPES.includes(targetWorker.type)) {
           setPendingUpdate({ workerId, targetType: targetWorker.type });
+          setAbsenceStartDate(new Date().toISOString().split('T')[0]);
         } else {
-          await updateWorkerType(workerId, targetWorker.type, null);
+          await updateWorkerType(workerId, targetWorker.type, null, null);
         }
       }
     }
@@ -107,9 +110,10 @@ export default function WorkerTypeManagement() {
 
   const handleConfirmAbsence = async () => {
     if (pendingUpdate && absenceEndDate) {
-      await updateWorkerType(pendingUpdate.workerId, pendingUpdate.targetType, absenceEndDate);
+      await updateWorkerType(pendingUpdate.workerId, pendingUpdate.targetType, absenceEndDate, absenceStartDate);
       setPendingUpdate(null);
       setAbsenceEndDate('');
+      setAbsenceStartDate(new Date().toISOString().split('T')[0]);
     }
   };
 
@@ -134,7 +138,7 @@ export default function WorkerTypeManagement() {
         </h1>
         <Link 
           to="/absence-consultation"
-          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2 transform hover:-translate-y-0.5 active:translate-y-0"
+          className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2 transform hover:-translate-y-0.5 active:translate-y"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -180,27 +184,44 @@ export default function WorkerTypeManagement() {
       {pendingUpdate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg p-6 shadow-xl max-w-sm w-full mx-4">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Choisir une date de fin</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Période d'absence</h3>
             <p className="text-sm text-gray-600 mb-4">
-              Indiquez quand l&apos;absence de <strong>{workers.find(w => w.id === pendingUpdate.workerId)?.name}</strong> se termine.
+              Indiquez les dates de début et de fin pour l&apos;absence de <strong>{workers.find(w => w.id === pendingUpdate.workerId)?.name}</strong>.
             </p>
-            <input
-              type="date"
-              value={absenceEndDate}
-              onChange={(e) => setAbsenceEndDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md mb-4 focus:ring-2 focus:ring-blue-500 outline-none"
-              min={new Date().toISOString().split('T')[0]}
-            />
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date de départ (comprise)</label>
+                <input
+                  type="date"
+                  value={absenceStartDate}
+                  onChange={(e) => setAbsenceStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date de retour (comprise)</label>
+                <input
+                  type="date"
+                  value={absenceEndDate}
+                  onChange={(e) => setAbsenceEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                  min={absenceStartDate}
+                />
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => { setPendingUpdate(null); setAbsenceEndDate(''); }}
+                onClick={() => { setPendingUpdate(null); setAbsenceEndDate(''); setAbsenceStartDate(new Date().toISOString().split('T')[0]); }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
                 Annuler
               </button>
               <button
                 onClick={handleConfirmAbsence}
-                disabled={!absenceEndDate}
+                disabled={!absenceEndDate || !absenceStartDate}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 Confirmer

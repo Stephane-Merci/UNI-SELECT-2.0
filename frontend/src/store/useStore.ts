@@ -86,7 +86,7 @@ interface AppState {
   deletePost: (postId: string, reassignOriginalPost?: Record<string, string>) => Promise<void>;
   assignWorker: (planId: string, workerId: string, postId: string) => Promise<void>;
   updateWorkerPresence: (planId: string, workerId: string, type: WorkerType) => Promise<void>;
-  updateWorkerType: (workerId: string, type: WorkerType, absenceEndDate?: string | null) => Promise<void>;
+  updateWorkerType: (workerId: string, type: WorkerType, absenceEndDate?: string | null, absenceStartDate?: string | null) => Promise<void>;
   updateWorkerOriginalPost: (workerId: string, originalPostId: string) => Promise<void>;
   removeAssignment: (assignmentId: string) => Promise<void>;
   addUnfilledPosition: (planId: string, postId: string) => Promise<void>;
@@ -431,17 +431,26 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  updateWorkerType: async (workerId, type, absenceEndDate) => {
+  updateWorkerType: async (workerId, type, absenceEndDate, absenceStartDate) => {
     // Optimistic update
     const previousWorkers = get().workers;
     set((state) => ({
       workers: state.workers.map((w) =>
-        w.id === workerId ? { ...w, type, absenceEndDate: absenceEndDate ?? w.absenceEndDate } : w
+        w.id === workerId ? { 
+          ...w, 
+          type, 
+          absenceEndDate: absenceEndDate ?? w.absenceEndDate,
+          absenceStartDate: absenceStartDate ?? w.absenceStartDate
+        } : w
       ),
     }));
 
     try {
-      const response = await apiClient.patch(`/workers/${workerId}/type`, { type, absenceEndDate });
+      const response = await apiClient.patch(`/workers/${workerId}/type`, { 
+        type, 
+        absenceEndDate,
+        absenceStartDate 
+      });
       set((state) => ({
         workers: state.workers.map((w) =>
           w.id === workerId ? response.data : w
