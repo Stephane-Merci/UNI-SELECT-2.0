@@ -8,6 +8,7 @@ import { io } from 'socket.io-client';
 export default function AbsenceConsultation() {
   const { workers, fetchWorkers, updateWorkerType } = useStore();
   const { user } = useAuthStore();
+  const [pendingUpdate, setPendingUpdate] = useState<{ workerId: string; targetType: WorkerType } | null>(null);
   const [absenceEndDate, setAbsenceEndDate] = useState<string>('');
   const [absenceStartDate, setAbsenceStartDate] = useState<string>('');
 

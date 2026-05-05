@@ -45,9 +45,7 @@ export default function MachineryCheckup() {
     };
   }, [currentPlan, fetchMachineryChecks]);
 
-  const postsRequiringMachinery = useMemo(() => {
-    return posts.filter((p) => p.needsMachinery);
-  }, [posts]);
+
 
   // All posts that either normally need machinery OR have an existing check in the current plan
   const relevantPosts = useMemo(() => {
